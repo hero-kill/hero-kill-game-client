@@ -22,6 +22,7 @@ private:
   int pull(const QString &name);
   int updatePack(const QString &pack, const QString &hash);
   int checkout(const QString &name, const QString &hash);
+  int resetWorkspace(const QString &name);
   int hasCommit(const QString &name, const QString &hash);
   int status(const QString &name);
   QString head(const QString &name);

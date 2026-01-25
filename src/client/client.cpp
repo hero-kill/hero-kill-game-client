@@ -166,9 +166,7 @@ void Client::notifyServer(const QString &command, const QVariant &jsonData) {
 }
 
 void Client::callLua(const QByteArray& command, const QByteArray& json_data, bool isRequest) {
-  qDebug() << "=== callLua ===" << command;
   L->call("ClientCallback", { QVariant::fromValue(this), command, json_data, isRequest });
-  qDebug() << "=== callLua done ===" << command;
 }
 
 ClientPlayer *Client::addPlayer(int id, const QString &name,

@@ -166,6 +166,16 @@ void PackMan::loadSummary(const QString &jsonData, bool useThread) {
 
       enablePack(name);
 
+      // 先检查工作区状态，如果脏就重置
+      err = status(name);
+      if (err == 100) {
+        qInfo() << "Workspace is dirty, resetting:" << name;
+        err = resetWorkspace(name);
+        if (err != 0) {
+          qCritical() << "Failed to reset workspace:" << name;
+        }
+      }
+
       if (head(name) != hash) {
         err = updatePack(name, hash);
         if (err != 0) {
@@ -206,8 +216,17 @@ void PackMan::loadSummary(const QString &jsonData, bool useThread) {
 int PackMan::updatePack(const QString &pack, const QString &hash) {
   int err;
   err = status(pack);
-  if (err != 0)
+  if (err == 100) {
+    // 工作区脏，自动重置
+    qInfo() << "Workspace is dirty, resetting:" << pack;
+    err = resetWorkspace(pack);
+    if (err != 0) {
+      qCritical() << "Failed to reset workspace:" << pack;
+      return err;
+    }
+  } else if (err != 0) {
     return err;
+  }
 
   err = hasCommit(pack, hash);
   if (err != 0) {
@@ -339,6 +358,24 @@ int PackMan::checkout(const QString &name, const QString &hash) {
   GIT_CHK_CLEAN;
   err = git_repository_set_head_detached(repo, &oid);
   GIT_CHK_CLEAN;
+  err = git_checkout_head(repo, &opt);
+  GIT_CHK_CLEAN;
+
+clean:
+  git_repository_free(repo);
+  return err;
+}
+
+int PackMan::resetWorkspace(const QString &name) {
+  git_repository *repo = NULL;
+  int err;
+  git_checkout_options opt = GIT_CHECKOUT_OPTIONS_INIT;
+  opt.checkout_strategy = GIT_CHECKOUT_FORCE;
+  auto path = QString("packages/%1").arg(name).toUtf8();
+
+  err = git_repository_open(&repo, path);
+  GIT_CHK_CLEAN;
+
   err = git_checkout_head(repo, &opt);
   GIT_CHK_CLEAN;
 

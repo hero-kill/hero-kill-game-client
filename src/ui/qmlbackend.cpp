@@ -136,10 +136,7 @@ void QmlBackend::joinServer(QString address, ushort port) {
 
   auto client = future.result();
   client->setParent(this);
-  connect(client, &Client::notifyUI, this, [=, this](const QString &cmd, const QVariant &data) {
-    qDebug() << "=== Client::notifyUI received ===" << cmd;
-    emit notifyUI(cmd, data);
-  });
+  connect(client, &Client::notifyUI, this, &QmlBackend::notifyUI);
   engine->rootContext()->setContextProperty("ClientInstance", client);
   engine->rootContext()->setContextProperty("Self", client->getSelf());
   connect(client, &Client::destroyed, this, [=, this](){
