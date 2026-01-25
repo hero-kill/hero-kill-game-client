@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef _REPLAYER_H
+#define _REPLAYER_H
+
+class Replayer : public QThread {
+  Q_OBJECT
+
+public:
+  explicit Replayer(QObject *parent, int id);
+  explicit Replayer(QObject *parent, const QString &filename);
+  ~Replayer();
+
+  int getDuration() const;
+  qreal getSpeed();
+
+signals:
+  void duration_set(int secs);
+  void elasped(int secs);
+  void speed_changed(qreal speed);
+  void command_parsed(const QByteArray &cmd, const QByteArray &j);
+
+public slots:
+  void uniform();
+  void toggle();
+  void speedUp();
+  void slowDown();
+  void shutdown();
+
+protected:
+  virtual void run();
+
+private:
+  QString fileName;
+  qreal speed;
+  bool playing;
+  bool killed;
+  bool uniformRunning;
+  QByteArray roomSettings;
+  QByteArray origPlayerInfo;
+  QByteArray recordType = "normal";
+  QMutex mutex;
+  QSemaphore play_sem;
+
+  struct Pair {
+    qint64 elapsed;
+    bool isRequest;
+    QByteArray cmd;
+    QByteArray jsonData;
+  };
+  QList<Pair *> pairs;
+
+  void loadRawData(const QByteArray &raw);
+};
+
+#endif // _REPLAYER_H

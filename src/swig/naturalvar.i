@@ -1,0 +1,295 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// ------------------------------------------------------
+// type bindings
+// ------------------------------------------------------
+
+%{
+#include "core/c-wrapper.h"
+#include "client/client.h"
+
+void Lua::pushValue(lua_State *L, QVariant v) {
+  QVariantList list;
+  QVariantMap map;
+  auto typeId = v.typeId();
+  switch (typeId) {
+  case QMetaType::Bool:
+    lua_pushboolean(L, v.toBool());
+    break;
+  case QMetaType::Int:
+  case QMetaType::UInt:
+    lua_pushinteger(L, v.toInt());
+    break;
+  case QMetaType::LongLong:
+    lua_pushinteger(L, v.toLongLong());
+    break;
+  case QMetaType::Double:
+    lua_pushnumber(L, v.toDouble());
+    break;
+  case QMetaType::QString: {
+    auto bytes = v.toString().toUtf8();
+    lua_pushstring(L, bytes.data());
+    break;
+  }
+  case QMetaType::QByteArray: {
+    auto ba = v.toByteArray();
+    lua_pushlstring(L, ba.data(), ba.size());
+    break;
+  }
+  case QMetaType::QVariantList:
+    lua_newtable(L);
+    list = v.toList();
+    for (int i = 1; i <= list.length(); i++) {
+      lua_pushinteger(L, i);
+      pushValue(L, list[i - 1]);
+      lua_settable(L, -3);
+    }
+    break;
+  case QMetaType::QVariantMap:
+    lua_newtable(L);
+    map = v.toMap();
+    for (auto i = map.cbegin(), end = map.cend(); i != end; i++) {
+      auto bytes = i.key().toUtf8();
+      lua_pushstring(L, bytes.data());
+      pushValue(L, i.value());
+      lua_settable(L, -3);
+    }
+    break;
+  case QMetaType::Nullptr:
+  case QMetaType::UnknownType: // 应该是 undefined，感觉很危险
+    lua_pushnil(L);
+    break;
+  default:
+    // 继续判自定义MetaType，这些不能在case语句判
+    if (typeId == QMetaType::fromType<Client *>().id()) {
+      SWIG_NewPointerObj(L, v.value<Client *>(), SWIGTYPE_p_Client, 0);
+    } else {
+      qCritical() << "cannot handle QVariant type" << v.typeId();
+      lua_pushnil(L);
+    }
+    break;
+  }
+}
+
+QVariant Lua::readValue(lua_State *L, int index, QHash<const void *, bool> stack) {
+  if (index == 0) index = lua_gettop(L);
+  auto tp = lua_type(L, index);
+  switch (tp) {
+    case LUA_TNIL:
+      return QVariant::fromValue(nullptr);
+    case LUA_TBOOLEAN:
+      return QVariant((bool)lua_toboolean(L, index));
+    case LUA_TNUMBER:
+      return QVariant(lua_tonumber(L, index));
+    case LUA_TSTRING: {
+      size_t len = lua_rawlen(L, index);
+      return QVariant(lua_tolstring(L, index, &len));
+    }
+    case LUA_TTABLE: {
+      auto p = lua_topointer(L, index);
+      if (stack[p]) {
+        qCritical("circular reference detected");
+        return QVariant();
+      }
+      stack[p] = true;
+
+      if (lua_getmetatable(L, index)) {
+        lua_pushstring(L, "__tocbor");
+        lua_rawget(L, -2);
+        if (!lua_isnil(L, -1)) {
+          // Found __tocbor metamethod
+          lua_pushvalue(L, index);  // Push the table as argument
+          if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+            qCritical("error calling __tocbor: %s", lua_tostring(L, -1));
+            lua_pop(L, 1);  // pop error message
+            return QVariant();
+          }
+
+          // Get the result string (must be string)
+          if (!lua_isstring(L, -1)) {
+            qCritical("__tocbor must return a string");
+            lua_pop(L, 1);  // pop non-string result
+            return QVariant();
+          }
+
+          size_t len = lua_rawlen(L, -1);
+          const char* data = lua_tolstring(L, -1, &len);
+          QByteArray result(data, len);
+          lua_pop(L, 1);  // pop the result
+          lua_pop(L, 1);  // pop the metatable
+          return QVariant(result);
+        }
+      }
+
+      lua_len(L, index);
+      int length = lua_tointeger(L, -1);
+      lua_pop(L, 1);
+
+      if (length == 0) {
+        bool empty = true;
+        QVariantMap map;
+
+        lua_pushnil(L);
+        while (lua_next(L, index) != 0) {
+          QString key;
+          if (lua_type(L, -2) == LUA_TNUMBER) {
+            key = lua_tostring(L, -2);
+          } else if (lua_type(L, -2) == LUA_TSTRING) {
+            key = lua_tostring(L, -2);
+          } else {
+            qCritical("key of object must be string");
+            return QVariant();
+          }
+
+          auto value = readValue(L, lua_gettop(L), stack);
+          lua_pop(L, 1);
+
+          map[key] = value;
+          empty = false;
+        }
+
+        if (empty) {
+          return QVariantList();
+        } else {
+          return map;
+        }
+      } else {
+        QVariantList arr;
+        for (int i = 1; i <= length; i++) {
+          lua_rawgeti(L, index, i);
+          arr << readValue(L, lua_gettop(L), stack);
+          lua_pop(L, 1);
+        }
+        return arr;
+      }
+      break;
+    }
+
+    // ignore function, userdata and thread
+    default:
+      qCritical("unexpected value type %s", lua_typename(L, tp));
+  }
+  return QVariant();
+}
+%}
+
+// Lua 5.4 特有的不能pushnumber， swig迟迟不更只好手动调教
+%typemap(out) int
+%{
+lua_pushinteger(L, $1);
+SWIG_arg ++;
+%}
+
+// QString and lua string
+%naturalvar QString;
+
+%typemap(in, checkfn = "lua_isstring") QString
+%{ $1 = lua_tostring(L, $input); %}
+
+%typemap(out) QString
+%{
+  if ($1.isEmpty()) {
+    lua_pushstring(L, "");
+  } else if ($1 == "__notready") {
+    lua_pushstring(L, "__notready");
+  } else {
+    lua_pushstring(L, $1.toUtf8());
+  }
+  SWIG_arg++;
+%}
+
+// const QString &
+
+%typemap(in, checkfn = "lua_isstring") QString const & ($*1_ltype temp)
+%{
+  temp = QString::fromUtf8(lua_tostring(L, $input));
+  $1 = &temp;
+%}
+
+%typemap(out) QString const &
+%{
+  if ($1.isEmpty()) {
+    lua_pushstring(L, "");
+  } else if ($1 == "__notready") {
+    lua_pushstring(L, "__notready");
+  } else {
+    lua_pushstring(L, $1.toUtf8());
+  }
+  SWIG_arg++;
+%}
+
+// 解决函数重载中类型检测问题
+%typecheck(SWIG_TYPECHECK_STRING) QString, QString const&, QByteArray, QByteArray const& {
+  $1 = lua_isstring(L,$input);
+}
+
+// QStringList
+%naturalvar QStringList;
+
+/* 没有从lua传入QStringList的情况，注释！
+%typemap(in, checkfn = "lua_istable") QStringList
+%{
+for (size_t i = 0; i < lua_rawlen(L, $input); ++i) {
+  lua_rawgeti(L, $input, i + 1);
+  const char *elem = luaL_checkstring(L, -1);
+  $1 << QString::fromUtf8(QByteArray(elem));
+  lua_pop(L, 1);
+}
+%}
+*/
+
+%typemap(out) QStringList
+%{
+lua_createtable(L, $1.length(), 0);
+
+for (int i = 0; i < $1.length(); i++) {
+  QString str = $1.at(i);
+  auto bytes = str.toUtf8();
+  lua_pushstring(L, bytes.constData());
+  lua_rawseti(L, -2, i + 1);
+}
+
+SWIG_arg++;
+%}
+
+%typemap(typecheck) QStringList
+%{
+  $1 = lua_istable(L, $input) ? 1 : 0;
+%}
+
+// QByteArray: 仅out
+
+%typemap(out) QByteArray
+%{
+  lua_pushlstring(L, $1.constData(), $1.size());
+  SWIG_arg++;
+%}
+
+// const QByteArray &: 仅in
+%typemap(arginit) QByteArray const &
+  "QByteArray $1_str;"
+
+%typemap(in, checkfn = "lua_isstring") QByteArray const & (size_t tempLen, const char * temp)
+%{
+  tempLen = lua_rawlen(L, $input);
+  temp = lua_tolstring(L, $input, &tempLen);
+  $1_str = QByteArray::fromRawData(temp, tempLen);
+  $1 = &$1_str;
+%}
+
+// QVariant: 用于json，out
+%typemap(out) QVariant
+%{
+  Lua::pushValue(L, $1);
+  SWIG_arg++;
+%}
+
+// const QVariant &: 用于json，in
+%typemap(arginit) QVariant const &
+  "QVariant $1_var;"
+
+%typemap(in) QVariant const &
+%{
+  $1_var = Lua::readValue(L, $input);
+  $1 = &$1_var;
+%}
