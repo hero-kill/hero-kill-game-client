@@ -3,6 +3,7 @@
 #include "client/client.h"
 #include "core/util.h"
 #include "core/c-wrapper.h"
+#include "core/packman.h"
 using namespace fkShell;
 
 #if defined(Q_OS_WIN32)
@@ -166,6 +167,7 @@ static void cleanUpGlobalStates() {
 
   if (ClientInstance) delete ClientInstance;
   // if (ServerInstance) delete ServerInstance;
+  if (Pacman) delete Pacman;
 
   qInstallMessageHandler(nullptr);
   qApp->deleteLater();
@@ -360,6 +362,8 @@ int freekill_main(int argc, char *argv[]) {
 
   DataService = new DataServiceProxy;
 
+  Pacman = new PackMan;
+
   // 创建符号链接，让 packages/standard 指向 packages/freekill-core/standard
   QFile::link("freekill-core/standard", "packages/standard");
   QFile::link("freekill-core/standard_cards", "packages/standard_cards");
@@ -369,6 +373,7 @@ int freekill_main(int argc, char *argv[]) {
   root->setContextProperty("FkVersion", FK_VERSION);
   root->setContextProperty("Backend", Backend);
   root->setContextProperty("DataService", DataService);
+  root->setContextProperty("Pacman", Pacman);
   root->setContextProperty("ModBackend", nullptr);
   root->setContextProperty("SysLocale", localeName);
 

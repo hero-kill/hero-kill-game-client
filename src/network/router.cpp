@@ -143,11 +143,14 @@ void Router::handlePacket(const QCborArray &packet) {
   auto command = packet[2].toByteArray();
   auto cborData = packet[3].toByteArray();
 
+  qDebug() << "=== handlePacket ===" << command << "type:" << type;
+
   if (type & COMPRESSED) {
     cborData = qUncompress(cborData);
   }
 
   if (type & TYPE_NOTIFICATION) {
+    qDebug() << "=== NOTIFICATION ===" << command;
     emit notification_got(command, cborData);
   } else if (type & TYPE_REQUEST) {
     this->requestId = requestId;

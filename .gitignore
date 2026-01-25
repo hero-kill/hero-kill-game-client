@@ -79,3 +79,4 @@ freekill-wrap.cxx
 .ace-tool/
 ./packages/**
 
+./packages/packages.json

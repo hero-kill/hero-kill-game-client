@@ -23,6 +23,7 @@ set(freekill_SRCS
   "core/player.cpp"
   "core/util.cpp"
   "core/c-wrapper.cpp"
+  "core/packman.cpp"
 
   "client/client.cpp"
   "client/clientplayer.cpp"
@@ -82,11 +83,14 @@ elseif (APPLE)
   set(SQLITE3_LIB sqlite3)
   set(CRYPTO_LIB OpenSSL::Crypto)
   set(READLINE_LIB readline)
+  set(GIT_LIB ${LIBGIT2_LIBRARIES})
+  target_link_directories(FreeKill PRIVATE ${LIBGIT2_LIBRARY_DIRS})
 else ()
   set(LUA_LIB lua5.4)
   set(SQLITE3_LIB sqlite3)
   set(CRYPTO_LIB OpenSSL::Crypto)
   set(READLINE_LIB readline)
+  set(GIT_LIB git2)
 endif ()
 
 add_library(libFreeKill STATIC ${freekill_SRCS})
@@ -99,6 +103,7 @@ target_link_libraries(libFreeKill PRIVATE
   ${READLINE_LIB}
   ${QT_LIB}
   ${SSH_LIB}
+  ${GIT_LIB}
   ${IDBFS_LIB}
   ${JEMALLOC_LIBRARIES}
 )
