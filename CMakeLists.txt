@@ -11,16 +11,23 @@ add_definitions(-DFK_VERSION=\"${CMAKE_PROJECT_VERSION}\")
 
 find_package(Qt6 REQUIRED COMPONENTS
   Network
-  Gui
-  Qml
-  Quick
-  QuickEffects
-  Widgets
-  Multimedia
-  QuickControls2
-  Concurrent
-  LinguistTools
 )
+
+if (NOT DEFINED FK_SERVER_ONLY)
+  find_package(Qt6 REQUIRED COMPONENTS
+    Gui
+    Qml
+    Quick
+    QuickEffects
+    Widgets
+    Multimedia
+    QuickControls2
+    Concurrent
+    LinguistTools
+  )
+else ()
+  add_definitions(-DFK_SERVER_ONLY)
+endif()
 
 if (DEFINED RPC_DEBUG)
   add_definitions(-DRPC_DEBUG)
@@ -31,27 +38,8 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 find_package(OpenSSL)
 find_package(Lua)
 find_package(SQLite3)
-
-# 查找 libgit2
-if (APPLE)
-  find_package(PkgConfig)
-  if (PkgConfig_FOUND)
-    pkg_check_modules(LIBGIT2 libgit2)
-    if (LIBGIT2_FOUND)
-      message(STATUS "Found libgit2: ${LIBGIT2_LIBRARIES}")
-    endif ()
-  endif ()
-elseif (WIN32)
-  set(GIT_LIB ${PROJECT_SOURCE_DIR}/lib/win/libgit2.dll)
-elseif (ANDROID)
-  if (DEFINED ENV{FK_ANDROID_SSL_DIR})
-    set(GIT_LIB $ENV{FK_ANDROID_SSL_DIR}/libgit2.so)
-  else ()
-    set(GIT_LIB ${PROJECT_SOURCE_DIR}/lib/android/libgit2.so)
-  endif ()
-else ()
-  set(GIT_LIB git2)
-endif ()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBGIT2 REQUIRED libgit2)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -82,16 +70,18 @@ endif ()
 qt_add_executable(FreeKill)
 link_directories(${LIBGIT2_LIBRARY_DIRS})
 
-qt_add_translations(FreeKill
-  TS_FILES lang/zh_CN.ts
-  QM_FILES_OUTPUT_VARIABLE zh_CN.qm
+if (NOT DEFINED FK_SERVER_ONLY)
+  qt_add_translations(FreeKill
+    TS_FILES lang/zh_CN.ts
+    QM_FILES_OUTPUT_VARIABLE zh_CN.qm
 
-  TS_FILES lang/en_US.ts
-  QM_FILES_OUTPUT_VARIABLE en_US.qm
+    TS_FILES lang/en_US.ts
+    QM_FILES_OUTPUT_VARIABLE en_US.qm
 
-  TS_FILES lang/vi_VN.ts
-  QM_FILES_OUTPUT_VARIABLE vi_VN.qm
-)
+    TS_FILES lang/vi_VN.ts
+    QM_FILES_OUTPUT_VARIABLE vi_VN.qm
+  )
+endif()
 
 add_custom_command(
   TARGET FreeKill

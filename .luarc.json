@@ -1,0 +1,11 @@
+{
+  "workspace.ignoreDir": [
+    "/lua",
+    "/packages/*",
+    "!/packages/freekill-core",
+    "!/packages/lunarltk",
+    "!/packages/utility",
+    "test_*.lua"
+  ],
+  "diagnostics.workspaceDelay": 3000000
+}

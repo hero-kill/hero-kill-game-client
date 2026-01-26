@@ -156,6 +156,9 @@ void QmlBackend::joinServer(QString address, ushort port) {
   });
   connect(client, &Client::toast_message, this, &QmlBackend::showToast);
 
+  // 通知 QML ClientInstance 已创建
+  emit clientInstanceCreated();
+
   client->connectToHost(address, port);
 }
 

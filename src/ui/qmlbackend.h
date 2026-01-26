@@ -76,6 +76,7 @@ signals:
   void notifyUI(const QString &command, const QVariant &data);
   void dialog(const QString &type, const QString &text, const QString &orig = QString());
   void volumeChanged(qreal);
+  void clientInstanceCreated();
   void replayerToggle();
   void replayerSpeedUp();
   void replayerSlowDown();

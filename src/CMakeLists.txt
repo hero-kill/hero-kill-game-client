@@ -28,6 +28,7 @@ set(freekill_SRCS
   "client/client.cpp"
   "client/clientplayer.cpp"
   "client/replayer.cpp"
+  "client/update_client.cpp"
 
   "network/client_socket.cpp"
   "network/router.cpp"

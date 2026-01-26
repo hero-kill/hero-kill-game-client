@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "client/client.h"
+#include "client/update_client.h"
 #include "core/util.h"
 #include "core/c-wrapper.h"
 #include "core/packman.h"
@@ -364,9 +365,7 @@ int freekill_main(int argc, char *argv[]) {
 
   Pacman = new PackMan;
 
-  // 创建符号链接，让 packages/standard 指向 packages/freekill-core/standard
-  QFile::link("freekill-core/standard", "packages/standard");
-  QFile::link("freekill-core/standard_cards", "packages/standard_cards");
+
 
   // 向 Qml 中先定义几个全局变量
   auto root = engine->rootContext();
@@ -376,6 +375,10 @@ int freekill_main(int argc, char *argv[]) {
   root->setContextProperty("Pacman", Pacman);
   root->setContextProperty("ModBackend", nullptr);
   root->setContextProperty("SysLocale", localeName);
+
+  // 创建 UpdateClient 用于预登录更新检查
+  auto updateClient = new UpdateClient(engine);
+  root->setContextProperty("UpdateClient", updateClient);
 
 #ifdef QT_DEBUG
   bool debugging = true;
