@@ -25,7 +25,6 @@ UpdateClient::UpdateClient(QObject *parent)
     // 连接 Router 的通知信号
     connect(m_router, &Router::notification_got, this, [this](const QByteArray &command, const QByteArray &data) {
         QString cmd = QString::fromUtf8(command);
-        qInfo() << "UpdateClient: 收到通知" << cmd;
         if (cmd == "NetworkDelayTest") {
             handleNetworkDelayTest(data);
         } else if (cmd == "UpdateInfo") {
@@ -36,8 +35,6 @@ UpdateClient::UpdateClient(QObject *parent)
             setState(Error, error);
         }
     });
-
-    qInfo() << "UpdateClient: 初始化完成，状态=" << m_state;
 }
 
 UpdateClient::~UpdateClient()
@@ -53,7 +50,6 @@ void UpdateClient::setState(UpdateState state, const QString &errorMessage)
         m_state = state;
         m_errorMessage = errorMessage;
         emit stateChanged(m_state);
-        qInfo() << "UpdateClient: 状态变更为" << m_state;
         if (!errorMessage.isEmpty()) {
             emit errorOccurred(errorMessage);
         }
@@ -123,7 +119,6 @@ void UpdateClient::retry()
 {
     // 允许在非终态下重试（Connected 状态可能是卡在等待 NetworkDelayTest）
     if (m_state != UpToDate && m_state != NeedRestart && m_state != VersionTooOld) {
-        qInfo() << "UpdateClient: 重试连接，当前状态=" << m_state;
         // 先断开再连接
         if (m_socket->isConnected()) {
             m_socket->disconnectFromHost();
@@ -136,8 +131,6 @@ void UpdateClient::retry()
             setState(Connecting);
             m_socket->connectToHost(m_serverAddr, m_serverPort);
         }
-    } else {
-        qWarning() << "UpdateClient: 当前状态不允许重试，状态=" << m_state;
     }
 }
 
@@ -199,8 +192,6 @@ void UpdateClient::handleNetworkDelayTest(const QByteArray &data)
     } else if (cbor.isByteArray()) {
         m_publicKey = QString::fromUtf8(cbor.toByteArray());
     }
-
-    qInfo() << "UpdateClient: 收到 NetworkDelayTest";
 
     emit publicKeyReceived(m_publicKey);
 
