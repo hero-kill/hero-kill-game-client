@@ -365,6 +365,9 @@ int freekill_main(int argc, char *argv[]) {
 
   Pacman = new PackMan;
 
+  // 创建符号链接，让 packages/standard 指向 packages/freekill-core/standard
+  QFile::link("freekill-core/standard", "packages/standard");
+  QFile::link("freekill-core/standard_cards", "packages/standard_cards");
 
 
   // 向 Qml 中先定义几个全局变量
