@@ -5,7 +5,6 @@
 %{
 #include "client/client.h"
 #include "core/player.h"
-#include "network/admin_service_proxy.h"
 #include "ui/qmlbackend.h"
 #include "core/util.h"
 
@@ -38,16 +37,5 @@ QString GetDisabledPacks();
 %typecheck(SWIG_TYPECHECK_POINTER) const QVariantMap & {
   $1 = lua_istable(L, $input);
 }
-
-// AdminService
-%nodefaultctor AdminServiceProxy;
-%nodefaultdtor AdminServiceProxy;
-class AdminServiceProxy {
-public:
-  QString executeAsync(const QString &action, const QVariantMap &params = QVariantMap());
-  QVariantMap execute(const QString &action, const QVariantMap &params = QVariantMap());
-};
-
-extern AdminServiceProxy *AdminService;
 
 // QVariant AskOllama(const QString &apiEndpoint, const QVariant &body);

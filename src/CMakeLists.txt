@@ -33,7 +33,6 @@ set(freekill_SRCS
   "network/client_socket.cpp"
   "network/router.cpp"
   "network/data_service_proxy.cpp"
-  "network/admin_service_proxy.cpp"
 
   "ui/qmlbackend.cpp"
 
