@@ -118,9 +118,15 @@ void QmlBackend::startServer(ushort port) {
 
 static ClientPlayer dummyPlayer(0, nullptr);
 
-void QmlBackend::joinServer(QString address, ushort port) {
+void QmlBackend::joinServer(QString address, ushort port, ushort udpPort) {
   if (ClientInstance != nullptr)
     return;
+
+  // 如果未指定 udpPort，默认与 tcpPort 相同
+  if (udpPort == 0) {
+    udpPort = port;
+  }
+  // udpPort 已在 QML 层存储到 Config.serverUdpPort，后续 UDP 通信可直接从 Config 获取
 
   auto future = QtConcurrent::run([&] {
     auto ret = new Client;
@@ -159,7 +165,7 @@ void QmlBackend::joinServer(QString address, ushort port) {
   // 通知 QML ClientInstance 已创建
   emit clientInstanceCreated();
 
-  client->connectToHost(address, port);
+  client->connectToHost(address, port, udpPort);
 }
 
 void QmlBackend::quitLobby(bool close) {

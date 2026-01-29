@@ -198,8 +198,9 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
 
     QString host = obj["host"].toString();
     int port = obj["port"].toInt(9527);
+    int udpPort = obj["udpPort"].toInt(port);  // 默认与 TCP 端口相同
     QString serverId = obj["serverId"].toString();
-    emit gameServerReceived(host, port, serverId);
+    emit gameServerReceived(host, port, udpPort, serverId);
     return;
   }
 

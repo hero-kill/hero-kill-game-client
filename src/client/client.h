@@ -16,8 +16,8 @@ public:
   Client(QObject *parent = nullptr);
   ~Client();
 
-  void connectToHost(const QString &server, ushort port);
-  Q_INVOKABLE void reconnectToHost(const QString &server, ushort port, const QString &token, const QString &globalRoomId);
+  void connectToHost(const QString &server, ushort port, ushort udpPort = 0);
+  Q_INVOKABLE void reconnectToHost(const QString &server, ushort port, ushort udpPort, const QString &token, const QString &globalRoomId);
   Q_INVOKABLE void sendSetupPacket(const QString &pubkey);
   void setupServerLag(qint64 server_time);
   qint64 getServerLag() const;

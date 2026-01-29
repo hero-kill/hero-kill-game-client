@@ -28,7 +28,7 @@ public:
   void setEngine(QQmlApplicationEngine *engine);
 
   Q_INVOKABLE void startServer(ushort port);
-  Q_INVOKABLE void joinServer(QString address, ushort port = 9527);
+  Q_INVOKABLE void joinServer(QString address, ushort port = 9527, ushort udpPort = 0);
 
   // Lobby
   Q_INVOKABLE void quitLobby(bool close = true);

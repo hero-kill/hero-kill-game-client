@@ -57,7 +57,7 @@ signals:
   // 请求刷新Token信号 - 客户端收到后应向游戏服务器请求刷新
   void tokenRefreshRequested(const QString &refreshToken);
   // Game Server 地址获取成功
-  void gameServerReceived(const QString &host, int port, const QString &serverId);
+  void gameServerReceived(const QString &host, int port, int udpPort, const QString &serverId);
   // Game Server 地址获取失败
   void gameServerFailed(const QString &error);
 

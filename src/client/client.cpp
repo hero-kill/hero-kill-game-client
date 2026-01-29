@@ -63,20 +63,25 @@ Client::~Client() {
   ClientInstance = nullptr;
 }
 
-void Client::connectToHost(const QString &server, ushort port) {
+void Client::connectToHost(const QString &server, ushort port, ushort udpPort) {
   // 确保工作目录在游戏根目录，避免远程连接时路径解析错误
   if (QDir::currentPath().endsWith("packages/freekill-core")) {
     QDir::setCurrent("../..");
   }
 
+  // udpPort 已存储在 QML Config.serverUdpPort 中，后续 UDP 通信可直接从 Config 获取
+  Q_UNUSED(udpPort);
+
   start_connent_timestamp = QDateTime::currentMSecsSinceEpoch();
   router->getSocket()->connectToHost(server, port);
 }
 
-void Client::reconnectToHost(const QString &server, ushort port, const QString &token, const QString &globalRoomId) {
+void Client::reconnectToHost(const QString &server, ushort port, ushort udpPort, const QString &token, const QString &globalRoomId) {
   // 保存跨服重连信息
   crossServerToken = token;
   crossServerGlobalRoomId = globalRoomId;
+  // udpPort 已在 QML 层存储到 Config.serverUdpPort，后续 UDP 通信可直接从 Config 获取
+  Q_UNUSED(udpPort);
 
   // 断开当前连接
   router->getSocket()->disconnectFromHost();
