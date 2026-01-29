@@ -3,14 +3,29 @@
 #include "data_service_proxy.h"
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QFile>
 
 DataServiceProxy *DataService = nullptr;
 
 DataServiceProxy::DataServiceProxy(QObject *parent)
     : QObject(parent)
     , m_manager(new QNetworkAccessManager(this))
-    , m_baseUrl("http://localhost:8082/api/v1")
 {
+  // 从配置文件读取 gatewayUrl
+  m_gatewayUrl = "http://localhost:9001";  // 默认值
+  QFile conf("freekill.client.config.json");
+  if (conf.open(QIODevice::ReadOnly)) {
+    QJsonDocument doc = QJsonDocument::fromJson(conf.readAll());
+    conf.close();
+    if (doc.isObject()) {
+      QJsonObject obj = doc.object();
+      if (obj.contains("gatewayUrl") && !obj["gatewayUrl"].toString().isEmpty()) {
+        m_gatewayUrl = obj["gatewayUrl"].toString();
+      }
+    }
+  }
+  m_baseUrl = m_gatewayUrl + "/api/user/v1";
+
   connect(m_manager, &QNetworkAccessManager::finished,
           this, &DataServiceProxy::onReplyFinished);
 }
@@ -27,6 +42,10 @@ void DataServiceProxy::setBaseUrl(const QString &url) {
 
 QString DataServiceProxy::getBaseUrl() const {
   return m_baseUrl;
+}
+
+QString DataServiceProxy::getGatewayUrl() const {
+  return m_gatewayUrl;
 }
 
 void DataServiceProxy::setAccessToken(const QString &token) {
@@ -57,6 +76,34 @@ QString DataServiceProxy::executeBatch(const QVariantList &requests) {
   return sendBatchRequest(requests);
 }
 
+void DataServiceProxy::fetchGameServer() {
+  QNetworkRequest request;
+  request.setUrl(QUrl(m_gatewayUrl + "/api/discovery/game-server"));
+  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+  QNetworkReply *reply = m_manager->get(request);
+
+  RequestInfo info;
+  info.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  info.action = "fetchGameServer";
+  info.isDiscovery = true;
+  m_pendingRequests[reply] = info;
+}
+
+void DataServiceProxy::fetchGameServerById(const QString &serverId) {
+  QNetworkRequest request;
+  request.setUrl(QUrl(m_gatewayUrl + "/api/discovery/game-server/" + serverId));
+  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+  QNetworkReply *reply = m_manager->get(request);
+
+  RequestInfo info;
+  info.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  info.action = "fetchGameServerById";
+  info.isDiscovery = true;
+  m_pendingRequests[reply] = info;
+}
+
 QString DataServiceProxy::sendRequest(const QString &endpoint, const QString &action,
                                        const QVariantMap &params, bool isRetry) {
   QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -83,6 +130,7 @@ QString DataServiceProxy::sendRequest(const QString &endpoint, const QString &ac
   info.endpoint = endpoint;
   info.params = params;
   info.isRetry = isRetry;
+  info.isDiscovery = false;
   m_pendingRequests[reply] = info;
 
   return requestId;
@@ -119,6 +167,7 @@ QString DataServiceProxy::sendBatchRequest(const QVariantList &requests) {
   info.requestId = requestId;
   info.action = "batch";
   info.endpoint = "/execute-batch";
+  info.isDiscovery = false;
   m_pendingRequests[reply] = info;
 
   return requestId;
@@ -127,7 +176,32 @@ QString DataServiceProxy::sendBatchRequest(const QVariantList &requests) {
 void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
   RequestInfo info = m_pendingRequests.take(reply);
   int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+  QByteArray responseData = reply->readAll();
+  bool hasNetworkError = reply->error() != QNetworkReply::NoError;
+  QString networkError = reply->errorString();
   reply->deleteLater();
+
+  // 处理服务发现请求
+  if (info.isDiscovery) {
+    if (hasNetworkError || statusCode != 200) {
+      emit gameServerFailed(networkError.isEmpty() ? "HTTP " + QString::number(statusCode) : networkError);
+      return;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(responseData);
+    QJsonObject obj = doc.object();
+
+    if (!obj["success"].toBool()) {
+      emit gameServerFailed(obj["error"].toString());
+      return;
+    }
+
+    QString host = obj["host"].toString();
+    int port = obj["port"].toInt(9527);
+    QString serverId = obj["serverId"].toString();
+    emit gameServerReceived(host, port, serverId);
+    return;
+  }
 
   // 处理401未授权错误 - 请求刷新Token
   if (statusCode == 401 && !info.isRetry && !m_refreshToken.isEmpty()) {
@@ -141,7 +215,6 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
     return;
   }
 
-  QByteArray responseData = reply->readAll();
   QJsonDocument doc = QJsonDocument::fromJson(responseData);
   QJsonObject obj = doc.object();
 
@@ -149,12 +222,12 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
   QString error;
   if (!obj["message"].isNull() && !obj["message"].toString().isEmpty()) {
     error = obj["message"].toString();
-  } else if (reply->error() != QNetworkReply::NoError) {
-    error = reply->errorString();
+  } else if (hasNetworkError) {
+    error = networkError;
   }
 
   // HTTP 错误或网络错误
-  if (statusCode != 200 || reply->error() != QNetworkReply::NoError) {
+  if (statusCode != 200 || hasNetworkError) {
     emit responseReceived(info.requestId, info.action, false, QVariant(), error);
     return;
   }

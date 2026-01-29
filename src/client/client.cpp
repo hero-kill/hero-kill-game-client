@@ -73,6 +73,21 @@ void Client::connectToHost(const QString &server, ushort port) {
   router->getSocket()->connectToHost(server, port);
 }
 
+void Client::reconnectToHost(const QString &server, ushort port, const QString &token, const QString &globalRoomId) {
+  // 保存跨服重连信息
+  crossServerToken = token;
+  crossServerGlobalRoomId = globalRoomId;
+
+  // 断开当前连接
+  router->getSocket()->disconnectFromHost();
+
+  // 重新连接到目标服务器
+  start_connent_timestamp = QDateTime::currentMSecsSinceEpoch();
+  router->getSocket()->connectToHost(server, port);
+
+  // 连接成功后会触发 Setup 流程，在 Setup 完成后需要发送 JoinRoomWithToken
+}
+
 QByteArray Client::pubEncrypt(const QByteArray &key, const QByteArray &data) {
   // 在用公钥加密口令时，也随机生成AES密钥/IV，并随着口令一起加密
   // AES密钥和IV都是固定16字节的，所以可以放在开头

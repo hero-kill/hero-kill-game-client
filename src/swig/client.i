@@ -27,6 +27,11 @@ public:
   Player *getSelf() const;
   void changeSelf(int id);
 
+  // 跨服重连相关
+  QString getCrossServerToken() const;
+  QString getCrossServerGlobalRoomId() const;
+  void clearCrossServerInfo();
+
   void saveRecord(const QByteArray &json, const QString &fname);
   void saveGameData(const QString &mode, const QString &general, const QString &deputy,
                     const QString &role, int result, const QString &replay,

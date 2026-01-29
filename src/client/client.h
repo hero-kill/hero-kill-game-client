@@ -17,6 +17,7 @@ public:
   ~Client();
 
   void connectToHost(const QString &server, ushort port);
+  Q_INVOKABLE void reconnectToHost(const QString &server, ushort port, const QString &token, const QString &globalRoomId);
   Q_INVOKABLE void sendSetupPacket(const QString &pubkey);
   void setupServerLag(qint64 server_time);
   qint64 getServerLag() const;
@@ -24,6 +25,11 @@ public:
   Q_INVOKABLE void setLoginInfo(const QString &username, const QString &password);
   Q_INVOKABLE void replyToServer(const QString &command, const QVariant &jsonData);
   Q_INVOKABLE void notifyServer(const QString &command, const QVariant &jsonData);
+
+  // 跨服重连相关
+  Q_INVOKABLE QString getCrossServerToken() const { return crossServerToken; }
+  Q_INVOKABLE QString getCrossServerGlobalRoomId() const { return crossServerGlobalRoomId; }
+  Q_INVOKABLE void clearCrossServerInfo() { crossServerToken.clear(); crossServerGlobalRoomId.clear(); }
 
   Q_INVOKABLE void callLua(const QByteArray &command, const QByteArray &jsonData, bool isRequest = false);
 
@@ -67,6 +73,10 @@ private:
   ClientPrivate *p_ptr;
   QString aes_key;
   QByteArray pubEncrypt(const QByteArray &key, const QByteArray &data);
+
+  // 跨服重连相关
+  QString crossServerToken;        // 跨服加入的预占位 Token
+  QString crossServerGlobalRoomId; // 跨服加入的全局房间 ID
 
   Lua *L;
   std::unique_ptr<Sqlite3> db;
