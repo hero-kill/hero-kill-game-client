@@ -20,7 +20,7 @@ public:
   void sendSetupPacket(const QString &pubkey);
   void setupServerLag(long long server_time);
 
-  void notifyServer(const QByteArray &command, const QString &data);
+  void notifyServer(const QString &command, const QVariant &jsonData);
 
   Player *addPlayer(int id, const QString &name, const QString &avatar);
   void removePlayer(int id);
