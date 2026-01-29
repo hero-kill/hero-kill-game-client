@@ -76,15 +76,22 @@ void Client::connectToHost(const QString &server, ushort port, ushort udpPort) {
   router->getSocket()->connectToHost(server, port);
 }
 
-void Client::reconnectToHost(const QString &server, ushort port, ushort udpPort, const QString &token, const QString &globalRoomId) {
-  // 保存跨服重连信息
+void Client::reconnectToHost(const QString &server, ushort port, ushort udpPort, const QString &token) {
+  // 保存跨服重连 Token（房间信息已编码在 Token 关联数据中）
   crossServerToken = token;
-  crossServerGlobalRoomId = globalRoomId;
   // udpPort 已在 QML 层存储到 Config.serverUdpPort，后续 UDP 通信可直接从 Config 获取
   Q_UNUSED(udpPort);
 
   // 断开当前连接
   router->getSocket()->disconnectFromHost();
+
+  // 设置重连超时 (15秒)
+  QTimer::singleShot(15000, this, [this]() {
+    if (!crossServerToken.isEmpty() && !router->getSocket()->isConnected()) {
+      clearCrossServerInfo();
+      emit error_message(tr("Cross-server connection timeout"));
+    }
+  });
 
   // 重新连接到目标服务器
   start_connent_timestamp = QDateTime::currentMSecsSinceEpoch();

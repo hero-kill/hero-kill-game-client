@@ -29,7 +29,6 @@ public:
 
   // 跨服重连相关
   QString getCrossServerToken() const;
-  QString getCrossServerGlobalRoomId() const;
   void clearCrossServerInfo();
 
   void saveRecord(const QByteArray &json, const QString &fname);
