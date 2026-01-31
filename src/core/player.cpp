@@ -10,7 +10,10 @@ Player::~Player() {}
 
 int Player::getId() const { return id; }
 
-void Player::setId(int id) { this->id = id; }
+void Player::setId(int id) {
+  this->id = id;
+  emit idChanged();
+}
 
 QString Player::getScreenName() const { return screenName; }
 

@@ -8,7 +8,7 @@
 class ClientPlayer : public Player {
   Q_OBJECT
 
-  Q_PROPERTY(int id READ getId CONSTANT)
+  Q_PROPERTY(int id READ getId NOTIFY idChanged)
   Q_PROPERTY(QString screenName
     READ getScreenName
     WRITE setScreenName

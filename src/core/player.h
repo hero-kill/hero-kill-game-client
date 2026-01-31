@@ -51,6 +51,7 @@ public:
   void setDied(bool died);
 
 signals:
+  void idChanged();
   void screenNameChanged();
   void avatarChanged();
   void stateChanged();
