@@ -1,6 +1,6 @@
 # 客户端服务器通讯文档
 
-> 最后更新: 2026-01-28
+> 最后更新: 2026-02-02
 
 本文档描述 Hero Kill 游戏客户端与服务端之间的通讯方式、协议格式和使用方法。
 
@@ -9,9 +9,10 @@
 ## 目录
 
 - [通讯方式概览](#通讯方式概览)
-- [1. TCP 直连通信](#1-tcp-直连通信)
-- [2. Lua RPC 通信](#2-lua-rpc-通信)
-- [3. AdminService RPC](#3-adminservice-rpc)
+- [1. HTTP API 通信](#1-http-api-通信)
+- [2. TCP 直连通信](#2-tcp-直连通信)
+- [3. Lua RPC 通信](#3-lua-rpc-通信)
+- [4. AdminService RPC](#4-adminservice-rpc)
 - [协议格式](#协议格式)
 - [消息流程图](#消息流程图)
 - [最佳实践](#最佳实践)
@@ -22,13 +23,182 @@
 
 | 方式 | 通道 | 阻塞 | 适用层 | 主要场景 |
 |------|------|------|--------|----------|
+| **HTTP API** | HTTP (JSON) | 否 | QML (C++) | 用户数据、非实时业务 |
 | **TCP 直连** | TCP Socket (CBOR) | 否 | QML / Lua Client | 实时游戏交互 |
 | **Lua RPC** | stdio (JSON-RPC) | 是 | Lua Server | 底层数据操作 |
-| **AdminService** | stdio (封装) | 可选 | Lua Server | 业务逻辑调用 |
+| **AdminService** | stdio (封装) | 可选 | Lua Server | 服务端内部业务调用 |
+
+### 通信架构图
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              客户端 (C++/QML)                            │
+└─────────────────────────────────────────────────────────────────────────┘
+        │                                           │
+        │ HTTP API (DataServiceProxy)               │ TCP 直连
+        │ 用户数据、好友、战绩等                      │ 实时游戏交互
+        ▼                                           ▼
+┌───────────────────┐                    ┌───────────────────┐
+│     Gateway       │                    │    Game Server    │
+│   (外网入口)       │                    │   (TCP/UDP)       │
+│   :9001 HTTP      │                    │   :9527 TCP       │
+└─────────┬─────────┘                    └─────────┬─────────┘
+          │                                        │
+          │ 路由转发                                │ Lua RPC (stdio)
+          ▼                                        ▼
+┌───────────────────┐                    ┌───────────────────┐
+│   User Service    │◄───────────────────│   Lua 游戏进程     │
+│   (用户服务)       │   Feign (内网)      │   (游戏逻辑)       │
+│   :8082           │   AdminService      │                   │
+└───────────────────┘                    └───────────────────┘
+```
 
 ---
 
-## 1. TCP 直连通信
+## 1. HTTP API 通信
+
+### 概述
+
+客户端通过 HTTP 请求访问 Gateway，Gateway 路由到 User 服务处理用户相关业务。这是客户端访问后端服务的**外网入口**。
+
+### 特点
+
+- **外网访问**：客户端 → Gateway → User 服务
+- **非阻塞**：异步请求，通过信号回调返回结果
+- **JWT 认证**：使用 Bearer Token 认证，支持自动刷新
+- **统一入口**：所有用户业务通过 `/api/user/v1/execute` 调用
+
+### 使用场景
+
+- 用户数据查询/修改（好友、战绩、设置）
+- 非实时业务操作
+- 服务发现（获取游戏服务器地址）
+
+### QML 层使用
+
+```qml
+import Fk
+
+// 同步执行（异步请求，通过信号返回）
+DataService.execute("getFriendList", { userId: 123 })
+
+// 异步执行（fire-and-forget，服务端立即返回）
+DataService.executeAsync("logUserAction", { action: "login" })
+
+// 批量执行
+DataService.executeBatch([
+    { action: "getFriendList", params: {} },
+    { action: "getRecentGames", params: { limit: 10 } }
+])
+
+// 服务发现 - 获取游戏服务器地址
+DataService.fetchGameServer()
+DataService.fetchGameServerById("server-001")
+```
+
+### 接收响应
+
+```qml
+Connections {
+    target: DataService
+
+    // 通用响应
+    function onResponseReceived(requestId, action, success, data, error) {
+        if (success) {
+            console.log("Action:", action, "Data:", JSON.stringify(data))
+        } else {
+            console.log("Error:", error)
+        }
+    }
+
+    // 游戏服务器地址获取成功
+    function onGameServerReceived(host, port, udpPort, serverId) {
+        console.log("Game server:", host, port)
+    }
+
+    // 游戏服务器地址获取失败
+    function onGameServerFailed(error) {
+        console.log("Failed to get game server:", error)
+    }
+}
+```
+
+### Token 管理
+
+```qml
+// 设置 Token（登录成功后）
+DataService.setAccessToken(accessToken)
+DataService.setRefreshToken(refreshToken)
+
+// Token 刷新流程（自动触发）
+Connections {
+    target: DataService
+
+    // 收到刷新请求信号后，向游戏服务器请求刷新
+    function onTokenRefreshRequested(refreshToken) {
+        // 通过 TCP 向游戏服务器请求刷新 Token
+        Cpp.notifyServer("RefreshToken", { refreshToken: refreshToken })
+    }
+}
+
+// 刷新成功后回调
+DataService.onTokenRefreshed(newAccessToken)
+// 刷新失败后回调
+DataService.onTokenRefreshFailed(error)
+```
+
+### API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/user/v1/execute` | POST | 同步执行 action |
+| `/api/user/v1/execute-async` | POST | 异步执行 action |
+| `/api/user/v1/execute-batch` | POST | 批量执行多个 action |
+| `/api/discovery/game-server` | GET | 获取可用游戏服务器 |
+| `/api/discovery/game-server/{id}` | GET | 获取指定游戏服务器 |
+
+### 请求格式
+
+```json
+// execute / execute-async
+{
+    "action": "getFriendList",
+    "params": {
+        "userId": 123
+    }
+}
+
+// execute-batch
+{
+    "requests": [
+        { "action": "getFriendList", "params": {} },
+        { "action": "getRecentGames", "params": { "limit": 10 } }
+    ]
+}
+```
+
+### 响应格式
+
+```json
+{
+    "success": true,
+    "data": { ... },
+    "message": "错误信息（失败时）"
+}
+```
+
+### 关键文件
+
+| 文件 | 说明 |
+|------|------|
+| `src/network/data_service_proxy.cpp` | C++ HTTP 客户端封装 |
+| `src/network/data_service_proxy.h` | 头文件定义 |
+| `hero-kill-gateway` | Gateway 路由服务 |
+| `hero-kill-user` | User 服务实现 |
+
+---
+
+## 2. TCP 直连通信
 
 ### 概述
 
@@ -123,7 +293,7 @@ end
 
 ---
 
-## 2. Lua RPC 通信
+## 3. Lua RPC 通信
 
 ### 概述
 
@@ -218,7 +388,7 @@ local globalState = player:getGlobalSaveState(key)
 
 ---
 
-## 3. AdminService RPC
+## 4. AdminService RPC
 
 ### 概述
 
@@ -478,12 +648,113 @@ enum PacketType {
 
 | 场景 | 推荐方式 | 原因 |
 |------|----------|------|
+| 用户数据（好友、战绩） | HTTP API | 外网访问，非实时 |
 | 游戏内实时操作 | TCP 直连 | 低延迟，非阻塞 |
-| 业务逻辑调用 | AdminService | 统一入口，可扩展 |
+| 服务端内部业务调用 | AdminService | 统一入口，可扩展 |
 | 底层数据操作 | Lua RPC | 直接访问服务端数据 |
 | 不需要返回值 | executeAsync | 减少阻塞时间 |
 
-### 2. 避免阻塞
+### 2. 接口设计规范
+
+根据操作特性选择合适的通信方式：
+
+#### 2.1 按操作时间和响应需求选择
+
+| 操作特性 | 推荐方式 | 示例 |
+|----------|----------|------|
+| 操作时间短，无需回复 | HTTP 异步请求 (`execute-async`) | 日志记录、埋点上报 |
+| 操作时间短，需要回复 | HTTP 同步请求 (`execute`) | 查询好友列表、获取战绩 |
+| 操作时间长，需要回复 | TCP Notify + 回调 | 匹配、组队邀请 |
+
+#### 2.2 长时操作处理模式
+
+```
+客户端发起长时操作的处理流程：
+
+┌──────────┐     HTTP 请求      ┌──────────┐
+│  客户端   │ ─────────────────> │  User    │
+│          │   (发起操作)        │  Service │
+└────┬─────┘                    └────┬─────┘
+     │                               │
+     │                               │ 立即返回 requestId
+     │ <─────────────────────────────┘
+     │
+     │        ... 等待操作完成 ...
+     │
+     │     TCP Notify (操作结果)  ┌──────────┐
+     │ <───────────────────────── │  Game    │
+     │                            │  Server  │
+     └────────────────────────────└──────────┘
+```
+
+#### 2.3 跨服务消息推送
+
+当 User 服务需要向在线用户推送消息时：
+
+```
+┌──────────┐                    ┌──────────┐                    ┌──────────┐
+│  User    │  1. 查询用户所在    │  Redis/  │                    │  Game    │
+│  Service │ ─────────────────> │  MySQL   │                    │  Server  │
+└────┬─────┘    服务器          └──────────┘                    └────┬─────┘
+     │                                                               │
+     │  2. HTTP 调用 GameServer                                      │
+     │ ─────────────────────────────────────────────────────────────>│
+     │     POST /internal/v1/push-message                            │
+     │     { userId, message }                                       │
+     │                                                               │
+     │                                          3. 获取用户 Session   │
+     │                                             推送 TCP 消息      │
+     │                                                               │
+     │                                                    ┌──────────┤
+     │                                                    │  客户端   │
+     │                                                    └──────────┘
+```
+
+#### 2.4 用户登录/切换服务器
+
+```
+┌──────────┐     登录请求       ┌──────────┐     MQ 通知        ┌──────────┐
+│  客户端   │ ─────────────────> │  Game    │ ─────────────────> │  User    │
+│          │                    │  Server  │                    │  Service │
+└──────────┘                    └────┬─────┘                    └────┬─────┘
+                                     │                               │
+                                     │                               │ 更新 MySQL
+                                     │                               │ (最后登录服务器)
+                                     │                               │
+```
+
+**关键点**：
+- GameServer 切换/登录/重连时，通过 **MQ 通知** User 服务
+- User 服务记录用户最后登录的服务器到 **MySQL**
+- 后续推送消息时，查询用户所在服务器，向对应 GameServer 发送 HTTP 请求
+
+### 3. HTTP API vs TCP 直连
+
+```
+客户端需要调用后端服务时，选择依据：
+
+┌─────────────────────────────────────────────────────────────┐
+│                      需要实时性？                            │
+└─────────────────────────────────────────────────────────────┘
+        │                                    │
+       是                                   否
+        │                                    │
+        ▼                                    ▼
+┌───────────────┐                  ┌───────────────────────┐
+│  TCP 直连      │                  │  是否需要访问用户服务？ │
+│  (游戏交互)    │                  └───────────────────────┘
+└───────────────┘                           │
+                                   ┌────────┴────────┐
+                                  是                 否
+                                   │                  │
+                                   ▼                  ▼
+                          ┌───────────────┐  ┌───────────────┐
+                          │  HTTP API      │  │  TCP 直连      │
+                          │  (DataService) │  │  (游戏服务器)  │
+                          └───────────────┘  └───────────────┘
+```
+
+### 4. 避免阻塞
 
 ```lua
 -- 不好：在循环中频繁调用同步 RPC
@@ -499,7 +770,7 @@ end
 fk.AdminService:execute("updatePlayers", { ids = playerIds })  -- 一次调用
 ```
 
-### 3. 错误处理
+### 5. 错误处理
 
 ```lua
 -- AdminService 调用
@@ -515,7 +786,7 @@ if not result.success then
 end
 ```
 
-### 4. 新增业务接口
+### 6. 新增业务接口
 
 **步骤**：
 
