@@ -39,10 +39,9 @@ public:
   // 批量执行 - POST /api/v1/execute-batch
   Q_INVOKABLE QString executeBatch(const QVariantList &requests);
 
-  // 获取 Game Server 地址 (通过 Gateway 服务发现)
-  Q_INVOKABLE void fetchGameServer();
-  // 获取指定 serverId 的 Game Server 地址
-  Q_INVOKABLE void fetchGameServerById(const QString &serverId);
+  // Gateway 通用请求 - 前端传入路径，C++ 只负责透传
+  Q_INVOKABLE QString gatewayGet(const QString &path);
+  Q_INVOKABLE QString gatewayPost(const QString &path, const QVariantMap &params = QVariantMap());
 
   // 刷新Token完成后调用，用于重试待处理的请求
   Q_INVOKABLE void onTokenRefreshed(const QString &newAccessToken);
@@ -56,10 +55,9 @@ signals:
                         bool success, const QVariant &data, const QString &error);
   // 请求刷新Token信号 - 客户端收到后应向游戏服务器请求刷新
   void tokenRefreshRequested(const QString &refreshToken);
-  // Game Server 地址获取成功
-  void gameServerReceived(const QString &host, int port, int udpPort, const QString &serverId);
-  // Game Server 地址获取失败
-  void gameServerFailed(const QString &error);
+  // Gateway 通用响应信号
+  void gatewayResponseReceived(const QString &requestId, bool success,
+                               const QVariant &data, const QString &error);
 
 private slots:
   void onReplyFinished(QNetworkReply *reply);
@@ -71,7 +69,7 @@ private:
     QString endpoint;
     QVariantMap params;  // 保存参数用于重试
     bool isRetry = false;
-    bool isDiscovery = false;  // 是否是服务发现请求
+    bool isGateway = false;  // 是否是 Gateway 通用请求
   };
 
   QString sendRequest(const QString &endpoint, const QString &action,

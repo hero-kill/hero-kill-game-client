@@ -76,32 +76,43 @@ QString DataServiceProxy::executeBatch(const QVariantList &requests) {
   return sendBatchRequest(requests);
 }
 
-void DataServiceProxy::fetchGameServer() {
+QString DataServiceProxy::gatewayGet(const QString &path) {
+  QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  QString fullUrl = m_gatewayUrl + path;
+
+
   QNetworkRequest request;
-  request.setUrl(QUrl(m_gatewayUrl + "/api/discovery/game-server"));
+  request.setUrl(QUrl(fullUrl));
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
   QNetworkReply *reply = m_manager->get(request);
 
   RequestInfo info;
-  info.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-  info.action = "fetchGameServer";
-  info.isDiscovery = true;
+  info.requestId = requestId;
+  info.action = path;
+  info.isGateway = true;
   m_pendingRequests[reply] = info;
+
+  return requestId;
 }
 
-void DataServiceProxy::fetchGameServerById(const QString &serverId) {
+QString DataServiceProxy::gatewayPost(const QString &path, const QVariantMap &params) {
+  QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
   QNetworkRequest request;
-  request.setUrl(QUrl(m_gatewayUrl + "/api/discovery/game-server/" + serverId));
+  request.setUrl(QUrl(m_gatewayUrl + path));
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-  QNetworkReply *reply = m_manager->get(request);
+  QByteArray data = QJsonDocument(QJsonObject::fromVariantMap(params)).toJson(QJsonDocument::Compact);
+  QNetworkReply *reply = m_manager->post(request, data);
 
   RequestInfo info;
-  info.requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-  info.action = "fetchGameServerById";
-  info.isDiscovery = true;
+  info.requestId = requestId;
+  info.action = path;
+  info.isGateway = true;
   m_pendingRequests[reply] = info;
+
+  return requestId;
 }
 
 QString DataServiceProxy::sendRequest(const QString &endpoint, const QString &action,
@@ -130,7 +141,7 @@ QString DataServiceProxy::sendRequest(const QString &endpoint, const QString &ac
   info.endpoint = endpoint;
   info.params = params;
   info.isRetry = isRetry;
-  info.isDiscovery = false;
+  info.isGateway = false;
   m_pendingRequests[reply] = info;
 
   return requestId;
@@ -167,7 +178,7 @@ QString DataServiceProxy::sendBatchRequest(const QVariantList &requests) {
   info.requestId = requestId;
   info.action = "batch";
   info.endpoint = "/execute-batch";
-  info.isDiscovery = false;
+  info.isGateway = false;
   m_pendingRequests[reply] = info;
 
   return requestId;
@@ -181,26 +192,13 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
   QString networkError = reply->errorString();
   reply->deleteLater();
 
-  // 处理服务发现请求
-  if (info.isDiscovery) {
-    if (hasNetworkError || statusCode != 200) {
-      emit gameServerFailed(networkError.isEmpty() ? "HTTP " + QString::number(statusCode) : networkError);
-      return;
-    }
+  // 处理 Gateway 通用请求
+  if (info.isGateway) {
 
     QJsonDocument doc = QJsonDocument::fromJson(responseData);
-    QJsonObject obj = doc.object();
-
-    if (!obj["success"].toBool()) {
-      emit gameServerFailed(obj["error"].toString());
-      return;
-    }
-
-    QString host = obj["host"].toString();
-    int port = obj["port"].toInt(9527);
-    int udpPort = obj["udpPort"].toInt(port);  // 默认与 TCP 端口相同
-    QString serverId = obj["serverId"].toString();
-    emit gameServerReceived(host, port, udpPort, serverId);
+    QVariant data = doc.object().toVariantMap();
+    bool success = !hasNetworkError && statusCode == 200;
+    emit gatewayResponseReceived(info.requestId, success, data, networkError);
     return;
   }
 
