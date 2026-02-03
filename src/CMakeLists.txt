@@ -143,12 +143,6 @@ install(FILES
   DESTINATION usr/share/applications
 )
 
-install(FILES
-  ${CMAKE_BINARY_DIR}/zh_CN.qm
-  ${CMAKE_BINARY_DIR}/en_US.qm
-  ${CMAKE_BINARY_DIR}/vi_VN.qm
-  DESTINATION usr/share/FreeKill
-)
 
 if(CPACK_GENERATOR STREQUAL "AppImage")
   install(CODE "

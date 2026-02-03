@@ -23,7 +23,6 @@ if (NOT DEFINED FK_SERVER_ONLY)
     Multimedia
     QuickControls2
     Concurrent
-    LinguistTools
   )
 else ()
   add_definitions(-DFK_SERVER_ONLY)
@@ -70,18 +69,6 @@ endif ()
 qt_add_executable(FreeKill)
 link_directories(${LIBGIT2_LIBRARY_DIRS})
 
-if (NOT DEFINED FK_SERVER_ONLY)
-  qt_add_translations(FreeKill
-    TS_FILES lang/zh_CN.ts
-    QM_FILES_OUTPUT_VARIABLE zh_CN.qm
-
-    TS_FILES lang/en_US.ts
-    QM_FILES_OUTPUT_VARIABLE en_US.qm
-
-    TS_FILES lang/vi_VN.ts
-    QM_FILES_OUTPUT_VARIABLE vi_VN.qm
-  )
-endif()
 
 add_custom_command(
   TARGET FreeKill

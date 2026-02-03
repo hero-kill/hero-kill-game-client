@@ -32,9 +32,6 @@ cp ../server/*.sql assets/res/server
 mkdir assets/res/client
 cp ../client/*.sql assets/res/client
 cp ../LICENSE assets/res
-cp ../zh_CN.qm assets/res
-cp ../en_US.qm assets/res
-cp ../vi_VN.qm assets/res
 cp ../fk_ver assets/res
 cp ../waiting_tips.txt assets/res
 

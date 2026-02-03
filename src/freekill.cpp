@@ -348,15 +348,6 @@ int freekill_main(int argc, char *argv[]) {
   QQuickStyle::setStyle("Material");
 #endif
 
-  QTranslator translator;
-  if (localeName.startsWith("zh_")) {
-    Q_UNUSED(translator.load("zh_CN.qm"));
-  } else if (localeName.startsWith("vi")) {
-    Q_UNUSED(translator.load("vi_VN.qm"));
-  } else {
-    Q_UNUSED(translator.load("en_US.qm"));
-  }
-  QCoreApplication::installTranslator(&translator);
 
   Backend = new QmlBackend;
   Backend->setEngine(engine);
