@@ -29,9 +29,30 @@ UpdateClient::UpdateClient(QObject *parent)
             handleNetworkDelayTest(data);
         } else if (cmd == "UpdateInfo") {
             handleUpdateInfo(data);
-        } else if (cmd == "ErrorMsg") {
+        } else if (cmd == "Error") {
             QCborValue cbor = QCborValue::fromCbor(data);
-            QString error = cbor.toString();
+            QString error;
+            if (cbor.isMap()) {
+                QCborMap map = cbor.toMap();
+                auto message = map.value("message");
+                if (message.isString()) {
+                    error = message.toString();
+                } else if (message.isByteArray()) {
+                    error = QString::fromUtf8(message.toByteArray());
+                }
+                if (error.isEmpty()) {
+                    auto code = map.value("code");
+                    if (code.isString()) {
+                        error = code.toString();
+                    } else if (code.isByteArray()) {
+                        error = QString::fromUtf8(code.toByteArray());
+                    }
+                }
+            } else if (cbor.isString()) {
+                error = cbor.toString();
+            } else if (cbor.isByteArray()) {
+                error = QString::fromUtf8(cbor.toByteArray());
+            }
             setState(Error, error);
         }
     });

@@ -217,12 +217,26 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
   QJsonDocument doc = QJsonDocument::fromJson(responseData);
   QJsonObject obj = doc.object();
 
-  // 优先使用 JSON 中的 message 字段作为错误信息
-  QString error;
-  if (!obj["message"].isNull() && !obj["message"].toString().isEmpty()) {
-    error = obj["message"].toString();
+  QVariant error;
+  QJsonObject errorObj = obj["error"].toObject();
+  if (!errorObj.isEmpty()) {
+    QVariantMap errorMap;
+    errorMap["code"] = errorObj["code"].toString();
+    errorMap["display"] = errorObj["display"].toString();
+    errorMap["message"] = errorObj["message"].toString();
+    error = errorMap;
   } else if (hasNetworkError) {
-    error = networkError;
+    QVariantMap errorMap;
+    errorMap["code"] = "NETWORK_ERROR";
+    errorMap["display"] = "toast";
+    errorMap["message"] = networkError;
+    error = errorMap;
+  } else if (!obj["message"].isNull() && !obj["message"].toString().isEmpty()) {
+    QVariantMap errorMap;
+    errorMap["code"] = "";
+    errorMap["display"] = "toast";
+    errorMap["message"] = obj["message"].toString();
+    error = errorMap;
   }
 
   // HTTP 错误或网络错误
@@ -234,7 +248,12 @@ void DataServiceProxy::onReplyFinished(QNetworkReply *reply) {
   bool success = obj["success"].toBool();
   QVariant data = obj["data"].toVariant();
 
-  emit responseReceived(info.requestId, info.action, success, data, error);
+  if (!success) {
+    emit responseReceived(info.requestId, info.action, false, QVariant(), error);
+    return;
+  }
+
+  emit responseReceived(info.requestId, info.action, true, data, QVariant());
 }
 
 void DataServiceProxy::onTokenRefreshed(const QString &newAccessToken) {
@@ -253,8 +272,12 @@ void DataServiceProxy::onTokenRefreshFailed(const QString &error) {
 
   // 通知所有待处理的请求失败
   for (const auto &info : m_pendingRetryRequests) {
+    QVariantMap errorMap;
+    errorMap["code"] = "TOKEN_REFRESH_FAILED";
+    errorMap["display"] = "toast";
+    errorMap["message"] = "Token refresh failed: " + error;
     emit responseReceived(info.requestId, info.action, false,
-                          QVariant(), "Token refresh failed: " + error);
+                          QVariant(), errorMap);
   }
   m_pendingRetryRequests.clear();
 }

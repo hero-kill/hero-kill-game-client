@@ -3,6 +3,7 @@
 #include "ui/qmlbackend.h"
 #include <qjsondocument.h>
 #include <qjsonobject.h>
+#include <QVariant>
 
 #ifndef FK_SERVER_ONLY
 #include <QAudioOutput>
@@ -113,7 +114,11 @@ void QmlBackend::setEngine(QQmlApplicationEngine *engine) {
 
 void QmlBackend::startServer(ushort port) {
   Q_UNUSED(port);
-  emit notifyUI("ErrorMsg", tr("Server features are not available in this client build."));
+  QVariantMap error;
+  error["code"] = "SERVICE_UNAVAILABLE";
+  error["display"] = "dialog";
+  error["message"] = tr("Server features are not available in this client build.");
+  emit notifyUI("Error", error);
 }
 
 static ClientPlayer dummyPlayer(0, nullptr);
@@ -154,8 +159,12 @@ void QmlBackend::joinServer(QString address, ushort port, ushort udpPort) {
       emit replayerShutdown();
     }
     client->deleteLater();
-    emit notifyUI("ErrorMsg", msg);
-    emit notifyUI("BackToStart", "[]");
+    QVariantMap error;
+    error["code"] = "NETWORK_ERROR";
+    error["display"] = "dialog";
+    error["message"] = msg;
+    emit notifyUI("Error", error);
+    emit notifyUI("Disconnect", error);
   });
   connect(client, &Client::self_changed, this, [=, this](){
     engine->rootContext()->setContextProperty("Self", client->getSelf());

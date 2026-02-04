@@ -183,9 +183,15 @@ DataService.onTokenRefreshFailed(error)
 {
     "success": true,
     "data": { ... },
-    "message": "错误信息（失败时）"
+    "error": {
+        "code": "ROOM_FULL",
+        "display": "toast",
+        "message": "房间已满"
+    }
 }
 ```
+
+> 说明：`error` 仅在 `success = false` 时返回，结构为 `{code, display, message}`。
 
 ### 关键文件
 
@@ -280,6 +286,30 @@ end
 | **Notify** | 单向通知，无需响应 | `notifyServer()` |
 | **Request** | 服务端请求，需要响应 | 服务端发起 |
 | **Reply** | 响应服务端请求 | `replyToServer()` |
+
+### 错误与通知（TCP）
+
+**Error 命令**：错误通知（纯提示）
+
+```json
+["Error", {
+  "code": "ROOM_FULL",
+  "display": "toast",
+  "message": "房间已满"
+}]
+```
+
+**Notification 命令**：交互通知（提示 + 动作）
+
+```json
+["Notification", {
+  "code": "RoomJoinRedirect",
+  "display": "custom",
+  "data": { ... }
+}]
+```
+
+> 说明：旧命令 `ErrorMsg/ErrorDlg/KickedFromRoom` 已废弃，请使用 `Error/Notification`。
 
 ### 关键文件
 
@@ -851,5 +881,6 @@ local result = fk.AdminService:execute("myAction", {
 | `MoveCards` | 卡牌移动 |
 | `PlayCard` | 出牌请求 |
 | `AskForSkillInvoke` | 询问技能发动 |
-| `ErrorMsg` | 错误消息 |
+| `Error` | 错误通知 |
+| `Notification` | 交互通知 |
 | `Chat` | 聊天消息 |

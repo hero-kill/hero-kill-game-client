@@ -52,7 +52,7 @@ signals:
   void baseUrlChanged();
   // 通用响应信号: requestId, action, success, data, error
   void responseReceived(const QString &requestId, const QString &action,
-                        bool success, const QVariant &data, const QString &error);
+                        bool success, const QVariant &data, const QVariant &error);
   // 请求刷新Token信号 - 客户端收到后应向游戏服务器请求刷新
   void tokenRefreshRequested(const QString &refreshToken);
   // Gateway 通用响应信号
