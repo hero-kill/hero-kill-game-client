@@ -2,7 +2,7 @@
   "workspace.ignoreDir": [
     "/lua",
     "/packages/*",
-    "!/packages/freekill-core",
+    "!/packages/herokill-core",
     "!/packages/lunarltk",
     "!/packages/utility",
     "test_*.lua"

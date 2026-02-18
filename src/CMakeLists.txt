@@ -1,24 +1,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 file(GLOB SWIG_FILES "${PROJECT_SOURCE_DIR}/src/swig/*.i")
-set(SWIG_SOURCE ${PROJECT_SOURCE_DIR}/src/swig/freekill.i)
+set(SWIG_SOURCE ${PROJECT_SOURCE_DIR}/src/swig/herokill.i)
 
 add_custom_command(
-  OUTPUT ${PROJECT_SOURCE_DIR}/src/swig/freekill-wrap.cxx
+  OUTPUT ${PROJECT_SOURCE_DIR}/src/swig/herokill-wrap.cxx
   DEPENDS ${SWIG_FILES}
-  COMMENT "Generating freekill-wrap.cxx"
+  COMMENT "Generating herokill-wrap.cxx"
   COMMAND swig -c++ -lua -Wall -o
-    ${PROJECT_SOURCE_DIR}/src/swig/freekill-wrap.cxx
+    ${PROJECT_SOURCE_DIR}/src/swig/herokill-wrap.cxx
     ${SWIG_SOURCE}
 )
 
-set(freekill_EXESRCS
+set(herokill_EXESRCS
   "main.cpp"
 )
 
-set(freekill_SRCS
+set(herokill_SRCS
   # "main.cpp"
-  "freekill.cpp"
+  "herokill.cpp"
 
   "core/player.cpp"
   "core/util.cpp"
@@ -36,10 +36,10 @@ set(freekill_SRCS
 
   "ui/qmlbackend.cpp"
 
-  "swig/freekill-wrap.cxx"
+  "swig/herokill-wrap.cxx"
 )
 set_source_files_properties(
-  "swig/freekill-wrap.cxx" PROPERTIES GENERATED TRUE)
+  "swig/herokill-wrap.cxx" PROPERTIES GENERATED TRUE)
 
 set(QT_LIB
   Qt6::Network
@@ -58,7 +58,7 @@ if (WIN32)
   set(SQLITE3_LIB ${PROJECT_SOURCE_DIR}/lib/win/sqlite3.dll)
   set(CRYPTO_LIB OpenSSL::Crypto)
   set(app_icon_resource_windows "${PROJECT_SOURCE_DIR}/image/icon.rc")
-  list(APPEND freekill_EXESRCS ${app_icon_resource_windows})
+  list(APPEND herokill_EXESRCS ${app_icon_resource_windows})
 elseif (ANDROID)
   if (DEFINED ENV{FK_ANDROID_SSL_DIR})
     set(SSL_DIR $ENV{FK_ANDROID_SSL_DIR})
@@ -73,7 +73,7 @@ elseif (ANDROID)
   set(LUA_LIB ${PROJECT_SOURCE_DIR}/lib/android/liblua54.so)
   set(SQLITE3_LIB ${PROJECT_SOURCE_DIR}/lib/android/libsqlite3.so)
 
-  set_target_properties(FreeKill PROPERTIES
+  set_target_properties(HeroKill PROPERTIES
     QT_ANDROID_PACKAGE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/android
     QT_ANDROID_EXTRA_LIBS "${LUA_LIB};${SQLITE3_LIB};${CRYPTO_LIB};${SSL_LIB};${GIT_LIB};${SSH_LIB}"
   )
@@ -84,7 +84,7 @@ elseif (APPLE)
   set(CRYPTO_LIB OpenSSL::Crypto)
   set(READLINE_LIB readline)
   set(GIT_LIB ${LIBGIT2_LIBRARIES})
-  target_link_directories(FreeKill PRIVATE ${LIBGIT2_LIBRARY_DIRS})
+  target_link_directories(HeroKill PRIVATE ${LIBGIT2_LIBRARY_DIRS})
 else ()
   set(LUA_LIB lua5.4)
   set(SQLITE3_LIB sqlite3)
@@ -93,9 +93,9 @@ else ()
   set(GIT_LIB git2)
 endif ()
 
-add_library(libFreeKill STATIC ${freekill_SRCS})
-target_precompile_headers(libFreeKill PRIVATE "pch.h")
-target_link_libraries(libFreeKill PRIVATE
+add_library(libHeroKill STATIC ${herokill_SRCS})
+target_precompile_headers(libHeroKill PRIVATE "pch.h")
+target_link_libraries(libHeroKill PRIVATE
   ${LUA_LIB}
   ${SQLITE3_LIB}
   ${CRYPTO_LIB}
@@ -109,37 +109,37 @@ target_link_libraries(libFreeKill PRIVATE
 )
 
 if (${CMAKE_BUILD_TYPE}0 STREQUAL "Debug0")
-  target_compile_definitions(libFreeKill PRIVATE QT_QML_DEBUG)
+  target_compile_definitions(libHeroKill PRIVATE QT_QML_DEBUG)
 endif ()
 
-target_sources(FreeKill PRIVATE ${freekill_EXESRCS})
-target_link_libraries(FreeKill PRIVATE
-  libFreeKill
+target_sources(HeroKill PRIVATE ${herokill_EXESRCS})
+target_link_libraries(HeroKill PRIVATE
+  libHeroKill
 )
 
-install(TARGETS FreeKill DESTINATION usr/bin)
+install(TARGETS HeroKill DESTINATION usr/bin)
 install(DIRECTORY
   ${PROJECT_SOURCE_DIR}/audio
   ${PROJECT_SOURCE_DIR}/fonts
   ${PROJECT_SOURCE_DIR}/image
   ${PROJECT_SOURCE_DIR}/client
-  DESTINATION usr/share/FreeKill
+  DESTINATION usr/share/HeroKill
 )
 install(DIRECTORY
-  ${PROJECT_SOURCE_DIR}/packages/freekill-core
-  DESTINATION usr/share/FreeKill/packages
+  ${PROJECT_SOURCE_DIR}/packages/herokill-core
+  DESTINATION usr/share/HeroKill/packages
 )
 install(FILES
   ${PROJECT_SOURCE_DIR}/fk_ver
-  DESTINATION usr/share/FreeKill
+  DESTINATION usr/share/HeroKill
 )
 install(FILES
   ${PROJECT_SOURCE_DIR}/image/icon.png
   DESTINATION usr/share/icons
-  RENAME FreeKill.png
+  RENAME HeroKill.png
 )
 install(FILES
-  ${PROJECT_SOURCE_DIR}/freekill.desktop
+  ${PROJECT_SOURCE_DIR}/herokill.desktop
   DESTINATION usr/share/applications
 )
 
@@ -148,18 +148,18 @@ if(CPACK_GENERATOR STREQUAL "AppImage")
   install(CODE "
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-                usr/share/icons/FreeKill.png
-                \${CMAKE_INSTALL_PREFIX}/FreeKill.png
+                usr/share/icons/HeroKill.png
+                \${CMAKE_INSTALL_PREFIX}/HeroKill.png
     )
   ")
 
   qt_generate_deploy_qml_app_script(
-    TARGET FreeKill
+    TARGET HeroKill
     OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
   )
   install(SCRIPT ${deploy_script})
 
-  set(CPACK_PACKAGE_ICON FreeKill)
+  set(CPACK_PACKAGE_ICON HeroKill)
   include(CPack)
 endif()

@@ -27,4 +27,4 @@ cd ../
 echo "=== 编译完成，启动客户端 ==="
 
 # 运行客户端
-./build/FreeKill
+./build/HeroKill

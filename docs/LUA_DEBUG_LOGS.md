@@ -8,7 +8,7 @@
 - 避免 `io.open` / `qInfo` 使用错误导致二次报错
 
 ### 调试点 1：统一入口 `ClientCallback`
-文件：`packages/freekill-core/lua/client/client.lua`
+文件：`packages/herokill-core/lua/client/client.lua`
 
 用途：记录每个命令的到达顺序和 payload 长度，定位“哪条命令触发了崩溃”。
 
@@ -32,7 +32,7 @@ end
 - `fk.qInfo` 只接受 **1 个字符串参数**，不要用类似 `fmt, arg1, arg2` 的传参方式
 
 ### 调试点 2：`GameLog` 解析入口 `parseMsg`
-文件：`packages/freekill-core/lua/lunarltk/client/client.lua`
+文件：`packages/herokill-core/lua/lunarltk/client/client.lua`
 
 用途：确认 `card` 类型与内容是否符合预期，尤其是 `card` 内元素是否包含 `getEffectiveId` 方法。
 

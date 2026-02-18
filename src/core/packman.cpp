@@ -486,9 +486,9 @@ cleanup:
 static const char *min_commit = "b57d89fa4c1a1ae5a0711b97598747b8cbc7428e";
 
 bool PackMan::shouldUseCore() {
-  if (!QFile::exists("packages/freekill-core")) return false;
-  if (disabled_packs.contains("freekill-core")) return false;
-  bool ret = is_head_newer_than_commit("packages/freekill-core", min_commit);
+  if (!QFile::exists("packages/herokill-core")) return false;
+  if (disabled_packs.contains("herokill-core")) return false;
+  bool ret = is_head_newer_than_commit("packages/herokill-core", min_commit);
   return ret;
 }
 

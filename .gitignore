@@ -19,21 +19,21 @@
 
 # file produced by game
 *.lock
-/FreeKill
-/FreeKill.exe
+/HeroKill
+/HeroKill.exe
 /mymod
 /recording
-freekill-wrap.cxx
+HeroKill-wrap.cxx
 /server/*
 !/server/init.sql
 !/server/gamedb_init.sql
 /client/client.db
 /client/autosave_recording
-/freekill.client.config.json
-/freekill.server.config.json
-/freekill.server.error.log
-/freekill.server.info.log
-/freekill.server.log
+/HeroKill.client.config.json
+/HeroKill.server.config.json
+/HeroKill.server.error.log
+/HeroKill.server.info.log
+/HeroKill.server.log
 /flist.txt
 /server-list.json
 /resource_pak
@@ -60,7 +60,7 @@ freekill-wrap.cxx
 /.idea/.gitignore
 /.idea/dataSources.xml
 
-/FreeKill.iml
+/HeroKill.iml
 /index.html
 /.idea/json_assistant_history.xml
 /.idea/material_theme_project_new.xml
@@ -74,3 +74,5 @@ freekill-wrap.cxx
 /crash.log
 /hero-game.iml
 .ace-tool/
+./packages/herokill-core/**
+/hero-kill-game-client.iml

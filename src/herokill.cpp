@@ -76,22 +76,22 @@ static void installFkAssets(const QString &src, const QString &dest) {
 #include <stdlib.h>
 #include <unistd.h>
 static void prepareForLinux() {
-  // 如果用户执行的是 /usr/bin/FreeKill，那么这意味着 freekill 是被包管理器安装
+  // 如果用户执行的是 /usr/bin/HeroKill，那么这意味着是被包管理器安装
   // 的，所以我们就需要把资源文件都复制到 ~/.local 中，并且切换当前目录
   // TODO: AppImage
   char buf[256] = {0};
   int len = readlink("/proc/self/exe", buf, 256);
   const char *home = getenv("HOME");
-  if (!strcmp(buf, "/usr/bin/FreeKill")) {
-    system("mkdir -p ~/.local/share/FreeKill");
-    installFkAssets("/usr/share/FreeKill", QString("%1/.local/share/FreeKill").arg(home));
+  if (!strcmp(buf, "/usr/bin/HeroKill")) {
+    system("mkdir -p ~/.local/share/HeroKill");
+    installFkAssets("/usr/share/HeroKill", QString("%1/.local/share/HeroKill").arg(home));
     chdir(home);
-    chdir(".local/share/FreeKill");
-  } else if (!strcmp(buf, "/usr/local/bin/FreeKill")) {
-    system("mkdir -p ~/.local/share/FreeKill");
-    installFkAssets("/usr/local/share/FreeKill", QString("%1/.local/share/FreeKill").arg(home));
+    chdir(".local/share/HeroKill");
+  } else if (!strcmp(buf, "/usr/local/bin/HeroKill")) {
+    system("mkdir -p ~/.local/share/HeroKill");
+    installFkAssets("/usr/local/share/HeroKill", QString("%1/.local/share/HeroKill").arg(home));
     chdir(home);
-    chdir(".local/share/FreeKill");
+    chdir(".local/share/HeroKill");
   }
 }
 #endif
@@ -181,9 +181,9 @@ static int runSkillTest(const QString &val, const QString &filepath) {
   QString script;
 
   QString originalPath = QDir::currentPath();
-  QString coreRoot = originalPath + "/packages/freekill-core";
+  QString coreRoot = originalPath + "/packages/herokill-core";
   QDir::setCurrent(coreRoot);
-  QByteArray coreLua = (coreRoot + "/lua/freekill.lua").toUtf8();
+  QByteArray coreLua = (coreRoot + "/lua/herokill.lua").toUtf8();
   int ret = 1;
   if (!L->dofile(coreLua.constData())) goto RET;
   QDir::setCurrent(originalPath);
@@ -220,14 +220,14 @@ RET:
   return ret;
 }
 
-// FreeKill 的程序主入口。整个程序就是从这里开始执行的。
-int freekill_main(int argc, char *argv[]) {
+// HeroKill 的程序主入口。整个程序就是从这里开始执行的。
+int herokill_main(int argc, char *argv[]) {
   // 初始化一下各种杂项信息
   QThread::currentThread()->setObjectName("Main");
 
   qInstallMessageHandler(fkMsgHandler);
   QCoreApplication *app;
-  QCoreApplication::setApplicationName("FreeKill");
+  QCoreApplication::setApplicationName("HeroKill");
   QCoreApplication::setApplicationVersion(FK_VERSION);
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
@@ -235,7 +235,7 @@ int freekill_main(int argc, char *argv[]) {
 #endif
 
   if (!log_file) {
-    log_file.reset(new QFile("freekill.server.log"));
+    log_file.reset(new QFile("herokill.server.log"));
     if (!log_file->open(QIODevice::WriteOnly | QIODevice::Text)) {
       qFatal("Cannot open info.log");
     }
@@ -243,7 +243,7 @@ int freekill_main(int argc, char *argv[]) {
 
   // 分析命令行，如果有 -s 或者 --server 就在命令行直接开服务器
   QCommandLineParser parser;
-  parser.setApplicationDescription("FreeKill client");
+  parser.setApplicationDescription("HeroKill client");
   parser.setSingleDashWordOptionMode(QCommandLineParser::ParseAsLongOptions);
   parser.addVersionOption();
   parser.addOption({{"h", "help"}, "display help information"});
@@ -304,19 +304,19 @@ int freekill_main(int argc, char *argv[]) {
   // 安卓：从Qt 6.8起需要别的办法拿activity
   // 参考文献 https://forum.qt.io/topic/159350/qt-6-8-0-replacement-for-qtnative-activity
   QJniObject::callStaticMethod<void>(
-    "org/notify/FreeKill/Helper", "SetActivity",
+    "org/notify/HeroKill/Helper", "SetActivity",
     "(Landroid/app/Activity;)V", QNativeInterface::QAndroidApplication::context().object()
   );
 
   // 安卓：获取系统语言需要使用Java才行
-  QString localeName = QJniObject::callStaticObjectMethod("org/notify/FreeKill/Helper", "GetLocaleCode", "()Ljava/lang/String;").toString();
+  QString localeName = QJniObject::callStaticObjectMethod("org/notify/HeroKill/Helper", "GetLocaleCode", "()Ljava/lang/String;").toString();
 
   // 安卓：先切换到我们安装程序的那个外部存储目录去
-  QJniObject::callStaticMethod<void>("org/notify/FreeKill/Helper", "InitView", "()V");
-  QDir::setCurrent("/storage/emulated/0/Android/data/org.notify.FreeKill/files");
+  QJniObject::callStaticMethod<void>("org/notify/HeroKill/Helper", "InitView", "()V");
+  QDir::setCurrent("/storage/emulated/0/Android/data/org.notify.HeroKill/files");
 
   // 切目录后重新设置log文件路径
-  log_file.reset(new QFile("freekill.server.log"));
+  log_file.reset(new QFile("herokill.server.log"));
   if (!log_file->open(QIODevice::WriteOnly | QIODevice::Text)) {
     qFatal("Cannot open info.log");
   }
@@ -356,9 +356,9 @@ int freekill_main(int argc, char *argv[]) {
 
   Pacman = new PackMan;
 
-  // 创建符号链接，让 packages/standard 指向 packages/freekill-core/standard
-  QFile::link("freekill-core/standard", "packages/standard");
-  QFile::link("freekill-core/standard_cards", "packages/standard_cards");
+  // 创建符号链接，让 packages/standard 指向 packages/herokill-core/standard
+  QFile::link("herokill-core/standard", "packages/standard");
+  QFile::link("herokill-core/standard_cards", "packages/standard_cards");
 
 
   // 向 Qml 中先定义几个全局变量
@@ -399,8 +399,8 @@ int freekill_main(int argc, char *argv[]) {
       "AppPath", QUrl::fromLocalFile(QDir::currentPath()));
 
   // 加载GUI了，如果core有的话用core的
-  engine->addImportPath("packages/freekill-core");
-  engine->load("packages/freekill-core/Fk/main.qml");
+  engine->addImportPath("packages/herokill-core");
+  engine->load("packages/herokill-core/Fk/main.qml");
 
   // qml 报错了就直接退出吧
   if (engine->rootObjects().isEmpty())

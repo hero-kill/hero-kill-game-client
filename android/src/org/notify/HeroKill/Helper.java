@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package org.notify.FreeKill;
+package org.notify.HeroKill;
 
 import java.util.*;
 import android.provider.Settings;

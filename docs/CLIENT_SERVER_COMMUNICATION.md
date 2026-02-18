@@ -318,8 +318,8 @@ end
 | `src/network/client_socket.cpp` | TCP Socket 封装 |
 | `src/network/router.cpp` | 协议路由层 |
 | `src/client/client.cpp` | 客户端核心类 |
-| `packages/freekill-core/Fk/Base/CppUtil.qml` | QML 工具类 |
-| `packages/freekill-core/lua/client/clientbase.lua` | Lua 客户端基类 |
+| `packages/herokill-core/Fk/Base/CppUtil.qml` | QML 工具类 |
+| `packages/herokill-core/lua/client/clientbase.lua` | Lua 客户端基类 |
 
 ---
 
@@ -411,9 +411,9 @@ local globalState = player:getGlobalSaveState(key)
 
 | 文件 | 说明 |
 |------|------|
-| `packages/freekill-core/lua/server/rpc/fk.lua` | RPC 封装层 |
-| `packages/freekill-core/lua/server/rpc/jsonrpc.lua` | JSON-RPC 协议 |
-| `packages/freekill-core/lua/server/rpc/stdio.lua` | stdio 通信 |
+| `packages/herokill-core/lua/server/rpc/fk.lua` | RPC 封装层 |
+| `packages/herokill-core/lua/server/rpc/jsonrpc.lua` | JSON-RPC 协议 |
+| `packages/herokill-core/lua/server/rpc/stdio.lua` | stdio 通信 |
 | `hero-kill-game/src/.../lua/LuaRpcDispatcher.java` | Java 端 RPC 分发器 |
 
 ---
@@ -527,7 +527,7 @@ public class UpdateWinRateHandler implements AdminActionHandler {
 
 | 文件 | 说明 |
 |------|------|
-| `packages/freekill-core/lua/server/rpc/fk.lua` | Lua 端 AdminService 封装 |
+| `packages/herokill-core/lua/server/rpc/fk.lua` | Lua 端 AdminService 封装 |
 | `hero-kill-game/src/.../service/AdminService.java` | Java 端服务实现 |
 
 ---

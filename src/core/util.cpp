@@ -88,7 +88,7 @@ QJsonDocument String2Json(const QString &str) {
 QString GetDeviceUuid() {
   QString ret;
 #ifdef Q_OS_ANDROID
-  QJniObject string = QJniObject::callStaticObjectMethod("org/notify/FreeKill/Helper", "GetSerial", "()Ljava/lang/String;");
+  QJniObject string = QJniObject::callStaticObjectMethod("org/notify/HeroKill/Helper", "GetSerial", "()Ljava/lang/String;");
   ret = string.toString();
 #else
   ret = QSysInfo::machineUniqueId();

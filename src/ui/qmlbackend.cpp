@@ -228,10 +228,10 @@ QString QmlBackend::getPublicServerList() {
 }
 
 QString QmlBackend::loadConf() {
-  QFile conf("freekill.client.config.json");
+  QFile conf("herokill.client.config.json");
   if (!conf.exists()) {
     if (!conf.open(QIODevice::WriteOnly)) {
-      qWarning() << "Failed to create freekill.client.config.json";
+      qWarning() << "Failed to create herokill.client.config.json";
       return "{}";
     }
     static const char *init_conf = "{}";
@@ -240,7 +240,7 @@ QString QmlBackend::loadConf() {
     return init_conf;
   }
   if (!conf.open(QIODevice::ReadOnly)) {
-    qWarning() << "Failed to open freekill.client.config.json for reading";
+    qWarning() << "Failed to open herokill.client.config.json for reading";
     return "{}";
   }
   auto ret = conf.readAll();
@@ -270,9 +270,9 @@ QString QmlBackend::loadTips() {
 }
 
 void QmlBackend::saveConf(const QString &conf) {
-  QFile c("freekill.client.config.json");
+  QFile c("herokill.client.config.json");
   if (!c.open(QIODevice::WriteOnly)) {
-    qWarning() << "Failed to open freekill.client.config.json for writing";
+    qWarning() << "Failed to open herokill.client.config.json for writing";
     return;
   }
   c.write(conf.toUtf8());
@@ -312,7 +312,7 @@ void QmlBackend::playSound(const QString &name, int index) {
   QString absolutePath = fileInfo.absoluteFilePath();
 
 #ifdef Q_OS_ANDROID
-  QJniObject::callStaticMethod<void>("org/notify/FreeKill/Helper", "PlaySound",
+  QJniObject::callStaticMethod<void>("org/notify/HeroKill/Helper", "PlaySound",
       "(Ljava/lang/String;F)V",
       QJniObject::fromString(absolutePath).object<jstring>(),
       (float)(m_volume / 100));
@@ -380,7 +380,7 @@ void QmlBackend::getServerInfo(const QString &address, ushort port) {
       }
       else if (host.error() == QHostInfo::HostNotFound
         && !address.contains(QChar(':'))) {
-        QDnsLookup* dns = new QDnsLookup(QDnsLookup::SRV, "_freekill._tcp." + addr);
+        QDnsLookup* dns = new QDnsLookup(QDnsLookup::SRV, "_herokill._tcp." + addr);
         connect(dns, &QDnsLookup::finished, this, [=, this]() {
           if (dns->error() != QDnsLookup::NoError) {
             return;

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-dir=FreeKill-${FK_VER}
+dir=HeroKill-${FK_VER}
 mkdir $dir
 echo Copying
-cp -r ./FreeKill/.git $dir
+cp -r ./HeroKill/.git $dir
 
 cd $dir
 git restore .

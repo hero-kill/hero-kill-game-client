@@ -13,7 +13,7 @@ DataServiceProxy::DataServiceProxy(QObject *parent)
 {
   // 从配置文件读取 gatewayUrl
   m_gatewayUrl = "http://localhost:9001";  // 默认值
-  QFile conf("freekill.client.config.json");
+  QFile conf("herokill.client.config.json");
   if (conf.open(QIODevice::ReadOnly)) {
     QJsonDocument doc = QJsonDocument::fromJson(conf.readAll());
     conf.close();

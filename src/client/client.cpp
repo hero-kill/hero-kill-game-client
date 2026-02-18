@@ -38,11 +38,11 @@ Client::Client(QObject *parent) : QObject(parent) {
 
   L = new Lua;
   QString originalPath = QDir::currentPath();
-  QString coreRoot = originalPath + "/packages/freekill-core";
+  QString coreRoot = originalPath + "/packages/herokill-core";
   // 危险的cd操作，记得在lua中切回游戏根目录
   QDir::setCurrent(coreRoot);
 
-  QByteArray coreLua = (coreRoot + "/lua/freekill.lua").toUtf8();
+  QByteArray coreLua = (coreRoot + "/lua/herokill.lua").toUtf8();
   QByteArray clientLua = (coreRoot + "/lua/client/client.lua").toUtf8();
   L->dofile(coreLua.constData());
   L->dofile(clientLua.constData());
@@ -65,7 +65,7 @@ Client::~Client() {
 
 void Client::connectToHost(const QString &server, ushort port, ushort udpPort) {
   // 确保工作目录在游戏根目录，避免远程连接时路径解析错误
-  if (QDir::currentPath().endsWith("packages/freekill-core")) {
+  if (QDir::currentPath().endsWith("packages/herokill-core")) {
     QDir::setCurrent("../..");
   }
 

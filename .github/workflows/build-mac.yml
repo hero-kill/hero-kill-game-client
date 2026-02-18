@@ -1,0 +1,202 @@
+name: Build For macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-arm64:
+    name: Build macOS ARM64
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Git Repo
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install swig
+        run: |
+          brew install swig
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: '6.10.0'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: 'qtmultimedia qtshadertools'
+
+      - name: Setup OpenSSL
+        run: |
+          brew install openssl@3
+
+      - name: Build libgit2 1.9.0
+        run: |
+          cd ..
+          git clone https://github.com/libgit2/libgit2
+          cd libgit2
+          git checkout v1.9.0
+          mkdir build
+          cd build
+          cmake .. \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_CLI=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Configure CMake Project
+        working-directory: ${{github.workspace}}
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                -DCMAKE_PREFIX_PATH=${{env.Qt6_Dir}} \
+                -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
+                -B ${{github.workspace}}/build
+
+      - name: Build project
+        working-directory: ${{github.workspace}}/build
+        run: make -j$(sysctl -n hw.ncpu)
+
+      - name: Package Application
+        working-directory: ${{github.workspace}}
+        run: |
+          mkdir -p HeroKill-arm64
+          cp -r build/HeroKill.app HeroKill-arm64/
+          cd HeroKill-arm64
+          ${{env.Qt6_Dir}}/bin/macdeployqt HeroKill.app
+          cp ../fk_ver HeroKill.app/Contents/MacOS/
+          cd ..
+          hdiutil create -volname HeroKill -srcfolder HeroKill-arm64 -ov -format UDZO HeroKill-arm64.dmg
+
+      - name: Upload Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-arm64
+          path: HeroKill-arm64.dmg
+
+  build-x86_64:
+    name: Build macOS x86_64
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout Git Repo
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install swig
+        run: |
+          brew install swig
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: '6.10.0'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: 'qtmultimedia qtshadertools'
+
+      - name: Setup OpenSSL
+        run: |
+          brew install openssl@3
+
+      - name: Build libgit2 1.9.0
+        run: |
+          cd ..
+          git clone https://github.com/libgit2/libgit2
+          cd libgit2
+          git checkout v1.9.0
+          mkdir build
+          cd build
+          cmake .. \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_CLI=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Configure CMake Project
+        working-directory: ${{github.workspace}}
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+                -DCMAKE_PREFIX_PATH=${{env.Qt6_Dir}} \
+                -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
+                -B ${{github.workspace}}/build
+
+      - name: Build project
+        working-directory: ${{github.workspace}}/build
+        run: make -j$(sysctl -n hw.ncpu)
+
+      - name: Package Application
+        working-directory: ${{github.workspace}}
+        run: |
+          mkdir -p HeroKill-x86_64
+          cp -r build/HeroKill.app HeroKill-x86_64/
+          cd HeroKill-x86_64
+          ${{env.Qt6_Dir}}/bin/macdeployqt HeroKill.app
+          cp ../fk_ver HeroKill.app/Contents/MacOS/
+          cd ..
+          hdiutil create -volname HeroKill -srcfolder HeroKill-x86_64 -ov -format UDZO HeroKill-x86_64.dmg
+
+      - name: Upload Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-x86_64
+          path: HeroKill-x86_64.dmg
+
+  release:
+    name: Release DMG
+    needs: [build-arm64, build-x86_64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Git Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        with:
+          fallback: 0.0.1
+
+      - name: Download ARM64 DMG from build
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg-arm64
+          path: dmg
+
+      - name: Download x86_64 DMG from build
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg-x86_64
+          path: dmg
+
+      - name: Rename DMG files
+        run: |
+          mv dmg/HeroKill-arm64.dmg dmg/HeroKill-${{ steps.previoustag.outputs.tag }}-arm64.dmg
+          mv dmg/HeroKill-x86_64.dmg dmg/HeroKill-${{ steps.previoustag.outputs.tag }}-x86_64.dmg
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.MY_TOKEN }}
+          tag_name: ${{ steps.previoustag.outputs.tag }}
+          files: |
+            dmg/HeroKill-${{ steps.previoustag.outputs.tag }}-arm64.dmg
+            dmg/HeroKill-${{ steps.previoustag.outputs.tag }}-x86_64.dmg

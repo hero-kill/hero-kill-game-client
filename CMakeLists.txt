@@ -6,7 +6,7 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(FreeKill VERSION 0.5.17)
+project(HeroKill VERSION 0.5.17)
 add_definitions(-DFK_VERSION=\"${CMAKE_PROJECT_VERSION}\")
 
 find_package(Qt6 REQUIRED COMPONENTS
@@ -66,12 +66,12 @@ if (DEFINED FK_USE_JEMALLOC)
   include_directories(${JEMALLOC_INCLUDE_DIRS})
 endif ()
 
-qt_add_executable(FreeKill)
+qt_add_executable(HeroKill)
 link_directories(${LIBGIT2_LIBRARY_DIRS})
 
 
 add_custom_command(
-  TARGET FreeKill
+  TARGET HeroKill
   POST_BUILD
   COMMENT "Generating version file fk_ver"
   COMMAND echo ${CMAKE_PROJECT_VERSION} > ${PROJECT_SOURCE_DIR}/fk_ver
