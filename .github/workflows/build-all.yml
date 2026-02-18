@@ -138,7 +138,16 @@ jobs:
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
-          "${{env.Qt6_DIR}}/bin/macdeployqt" HeroKill.app
+          echo "Qt6_DIR is: $Qt6_DIR"
+          echo "Full path would be: $Qt6_DIR/bin/macdeployqt"
+          if [ -x "$Qt6_DIR/bin/macdeployqt" ]; then
+            echo "Using macdeployqt from Qt directory"
+            "$Qt6_DIR/bin/macdeployqt" HeroKill.app
+          else
+            echo "macdeployqt not found in Qt directory, trying system path"
+            which macdeployqt || echo "macdeployqt not found in PATH"
+            macdeployqt HeroKill.app
+          fi
           cp ../fk_ver HeroKill.app/Contents/MacOS/
           cd ..
           hdiutil create -volname HeroKill -srcfolder HeroKill-macOS -ov -format UDZO \
