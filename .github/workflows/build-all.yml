@@ -1,0 +1,372 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+env:
+  QT_VERSION: '6.10.0'
+  LUA_VERSION: '5.4.7'
+  OPENSSL_VERSION: '3.4.1'
+  LIBGIT2_VERSION: '1.9.0'
+
+jobs:
+  # ─────────────────────────────────────────────
+  # macOS Universal (arm64 + x86_64)
+  # ─────────────────────────────────────────────
+  build-macos:
+    name: macOS Universal
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install build tools
+        run: brew install swig
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: ${{env.QT_VERSION}}
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: 'qtmultimedia qtshadertools'
+
+      - name: Cache native dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/liblua*
+            /usr/local/include/lua*
+            /usr/local/include/lauxlib.h
+            /usr/local/include/lualib.h
+            /usr/local/include/luaconf.h
+            /tmp/openssl-universal
+            /usr/local/lib/libgit2*
+            /usr/local/lib/pkgconfig/libgit2.pc
+            /usr/local/include/git2*
+          key: macos-deps-lua${{env.LUA_VERSION}}-ssl${{env.OPENSSL_VERSION}}-git2${{env.LIBGIT2_VERSION}}-v1
+
+      - name: Build Lua (universal)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          cd ..
+          curl -LO https://www.lua.org/ftp/lua-${{env.LUA_VERSION}}.tar.gz
+          tar xf lua-${{env.LUA_VERSION}}.tar.gz
+          cd lua-${{env.LUA_VERSION}}
+          make macosx MYCFLAGS="-arch arm64 -arch x86_64" MYLDFLAGS="-arch arm64 -arch x86_64" -j$(sysctl -n hw.ncpu)
+          sudo make install
+
+      - name: Build OpenSSL (universal)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          cd ..
+          curl -LO https://github.com/openssl/openssl/releases/download/openssl-${{env.OPENSSL_VERSION}}/openssl-${{env.OPENSSL_VERSION}}.tar.gz
+          tar xf openssl-${{env.OPENSSL_VERSION}}.tar.gz
+
+          cp -r openssl-${{env.OPENSSL_VERSION}} openssl-arm64
+          cd openssl-arm64
+          ./Configure darwin64-arm64 no-tests --prefix=/tmp/openssl-arm64
+          make -j$(sysctl -n hw.ncpu) && make install_sw
+          cd ..
+
+          cp -r openssl-${{env.OPENSSL_VERSION}} openssl-x86_64
+          cd openssl-x86_64
+          ./Configure darwin64-x86_64 no-tests --prefix=/tmp/openssl-x86_64
+          make -j$(sysctl -n hw.ncpu) && make install_sw
+          cd ..
+
+          mkdir -p /tmp/openssl-universal/lib
+          cp -r /tmp/openssl-arm64/include /tmp/openssl-universal/
+          lipo -create /tmp/openssl-arm64/lib/libcrypto.a /tmp/openssl-x86_64/lib/libcrypto.a \
+            -output /tmp/openssl-universal/lib/libcrypto.a
+          lipo -create /tmp/openssl-arm64/lib/libssl.a /tmp/openssl-x86_64/lib/libssl.a \
+            -output /tmp/openssl-universal/lib/libssl.a
+
+      - name: Build libgit2 (universal)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          cd ..
+          git clone https://github.com/libgit2/libgit2
+          cd libgit2
+          git checkout v${{env.LIBGIT2_VERSION}}
+          mkdir build && cd build
+          cmake .. \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_CLI=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DOPENSSL_ROOT_DIR=/tmp/openssl-universal
+          make -j$(sysctl -n hw.ncpu)
+          sudo make install
+
+      - name: Configure
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+                -DCMAKE_PREFIX_PATH=${{env.Qt6_Dir}} \
+                -DOPENSSL_ROOT_DIR=/tmp/openssl-universal \
+                -B build
+
+      - name: Build
+        run: make -j$(sysctl -n hw.ncpu) -C build
+
+      - name: Package
+        run: |
+          mkdir -p HeroKill-macOS
+          cp -r build/HeroKill.app HeroKill-macOS/
+          cd HeroKill-macOS
+          ${{env.Qt6_Dir}}/bin/macdeployqt HeroKill.app
+          cp ../fk_ver HeroKill.app/Contents/MacOS/
+          cd ..
+          hdiutil create -volname HeroKill -srcfolder HeroKill-macOS -ov -format UDZO \
+            HeroKill-${{github.ref_name}}-macOS.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: HeroKill-${{github.ref_name}}-macOS.dmg
+
+  # ─────────────────────────────────────────────
+  # Windows x64
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install swig
+        run: choco install swig -y
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: ${{env.QT_VERSION}}
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          modules: 'qtmultimedia qtshadertools'
+          tools: 'tools_opensslv3_x64 tools_mingw1310'
+
+      - name: Disable PCH
+        shell: bash
+        run: |
+          cd src
+          find -name "*.cpp" -exec sed -i '1i #include "pch.h"' "{}" \;
+          find -name "*.h" -exec sed -i '1i #include "pch.h"' "{}" \;
+          sed -i '1d' pch.h
+          sed -i '1d' main.cpp
+          sed -i '/pch.h/d' CMakeLists.txt
+
+      - name: Configure
+        env:
+          CMAKE_PREFIX_PATH: ${{env.Qt6_Dir}}
+          CC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/gcc.exe
+          CXX: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/g++.exe
+          RC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/windres.exe
+          OPENSSL_ROOT_DIR: ${{env.Qt6_Dir}}/../../Tools/OpenSSLv3/Win_x64
+          OPENSSL_INCLUDE_DIR: ${{env.OPENSSL_ROOT_DIR}}/include
+          OPENSSL_CRYPTO_LIBRARY: ${{env.OPENSSL_ROOT_DIR}}/bin/libcrypto-3-x64.dll
+        run: cmake -DCMAKE_BUILD_TYPE=MinSizeRel -G "MinGW Makefiles" -B build
+
+      - name: Build
+        working-directory: build
+        run: mingw32-make -j4
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir HeroKill-release
+          cp build/HeroKill.exe HeroKill-release
+          cd HeroKill-release
+          windeployqt HeroKill.exe
+          cd ..
+          cp lib/win/* HeroKill-release
+          cp fk_ver HeroKill-release
+          cp ../Qt/${{env.QT_VERSION}}/mingw_64/bin/li*.dll HeroKill-release
+          cp ../Qt/Tools/OpenSSLv3/Win_x64/bin/*.dll HeroKill-release
+          7z a -t7z HeroKill-${{github.ref_name}}-Windows.7z HeroKill-release -r -mx=9 -m0=LZMA2 -ms=10m -mf=on -mhc=on -mmt=on
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: HeroKill-${{github.ref_name}}-Windows.7z
+
+  # ─────────────────────────────────────────────
+  # Android arm64-v8a
+  # ─────────────────────────────────────────────
+  build-android:
+    name: Android arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Android SDK/NDK
+        run: |
+          cd ..
+          mkdir android && cd android
+          wget --quiet https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip commandlinetools-linux-9477386_latest.zip
+          yes | ./cmdline-tools/bin/sdkmanager --sdk_root=$(pwd) \
+            "platforms;android-35" \
+            "platform-tools" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018"
+
+      - name: Setup OpenSSL for Android
+        run: |
+          cd ..
+          wget --quiet https://github.com/openssl/openssl/releases/download/openssl-3.1.8/openssl-3.1.8.tar.gz
+          tar xf openssl-3.1.8.tar.gz
+          cd openssl-3.1.8
+          git clone https://github.com/KDAB/android_openssl
+          rm -rf include
+          cp -r android_openssl/ssl_3/include .
+          cp -r android_openssl/ssl_3/arm64-v8a/libcrypto_3.so .
+          cp -r android_openssl/ssl_3/arm64-v8a/libssl_3.so .
+          cd ../hero-kill-game-client
+          cp -r ../openssl-3.1.8/include/openssl ./include
+
+      - name: Build libgit2 for Android
+        run: |
+          cd ..
+          git clone https://github.com/libgit2/libgit2
+          cd libgit2
+          git checkout v${{env.LIBGIT2_VERSION}}
+          mkdir build && cd build
+          export ANDROID_SDK_ROOT=$(pwd)/../../android
+          export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
+          PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+          SSL_DIR=$(pwd)/../../openssl-3.1.8
+          cmake .. \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_CLI=OFF \
+            -DCMAKE_SYSTEM_NAME=Android \
+            -DCMAKE_SYSTEM_VERSION=29 \
+            -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+            -DCMAKE_ANDROID_NDK=${ANDROID_NDK_ROOT} \
+            -DOPENSSL_INCLUDE_DIR="${SSL_DIR}/include" \
+            -DOPENSSL_CRYPTO_LIBRARY="${SSL_DIR}/libcrypto_3.so" \
+            -DOPENSSL_SSL_LIBRARY="${SSL_DIR}/libssl_3.so"
+          make -j$(nproc)
+          cp libgit2.so ${SSL_DIR}
+
+      - name: Install swig
+        run: sudo apt-get install -y swig
+
+      - name: Install Qt (Host)
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: ${{env.QT_VERSION}}
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+          modules: 'qtmultimedia qtshadertools'
+
+      - name: Install Qt (Android)
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          py7zrversion: '>=0.20.2'
+          version: ${{env.QT_VERSION}}
+          host: 'linux'
+          target: 'android'
+          arch: 'android_arm64_v8a'
+          modules: 'qtmultimedia qtshadertools'
+
+      - name: Prepare Android assets
+        run: |
+          FKVER=$(cat CMakeLists.txt | grep 'project(HeroKill' | cut -d ' ' -f 3)
+          cd android
+          sed -i 's/function //g' copy_assets.sh
+          ./copy_assets.sh || true
+          cd assets/res
+          cp -r /etc/ssl/certs .
+          cp /usr/share/ca-certificates/mozilla/* certs/
+          cd ../..
+          echo ${FKVER%)} > ../fk_ver
+          ../genfkver.sh
+          cp ../fk_ver assets/res
+
+      - name: Configure
+        run: |
+          export QT_HOST_PATH=${Qt6_DIR}/../gcc_64/
+          export ANDROID_SDK_ROOT=$(pwd)/../android
+          export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
+          export FK_ANDROID_SSL_DIR=$(pwd)/../openssl-3.1.8
+          sed -i "s/LinguistTools/Linguist/g" CMakeLists.txt
+          ${Qt6_DIR}/bin/qt-cmake -S . -B ./build -DCMAKE_BUILD_TYPE=MinSizeRel
+
+      - name: Build
+        run: make -j2 -C build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: build/android-build/build/outputs/apk/release/android-build-release-unsigned.apk
+
+  # ─────────────────────────────────────────────
+  # Unified Release
+  # ─────────────────────────────────────────────
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-macos, build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Sign Android APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: artifacts/android
+          signingKeyBase64: ${{ secrets.KEY_STORE }}
+          alias: ${{ secrets.KEY_STORE_ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "35.0.0"
+
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp artifacts/macos/*.dmg release/
+          cp artifacts/windows/*.7z release/
+          mv ${{ steps.sign_app.outputs.signedReleaseFile }} \
+            release/HeroKill-${{github.ref_name}}-Android.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.MY_TOKEN }}
+          tag_name: ${{github.ref_name}}
+          name: HeroKill ${{github.ref_name}}
+          generate_release_notes: true
+          files: release/*
