@@ -138,18 +138,25 @@ jobs:
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
-          echo "Qt6_DIR is: $Qt6_DIR"
-          if [ -n "$Qt6_DIR" ] && [ -x "$Qt6_DIR/bin/macdeployqt" ]; then
-            echo "Using macdeployqt from Qt directory: $Qt6_DIR/bin/macdeployqt"
-            "$Qt6_DIR/bin/macdeployqt" HeroKill.app
+          
+          # 检查Qt6_DIR环境变量
+          echo "Qt6_DIR environment variable: ${{env.Qt6_DIR}}"
+          echo "Qt6_DIR shell variable: $Qt6_DIR"
+          
+          # 使用GitHub Actions变量确保路径正确
+          if [ -x "${{env.Qt6_DIR}}/bin/macdeployqt" ]; then
+            echo "Using macdeployqt from Qt directory: ${{env.Qt6_DIR}}/bin/macdeployqt"
+            "${{env.Qt6_DIR}}/bin/macdeployqt" HeroKill.app
           else
-            echo "Qt6_DIR is not set or macdeployqt not found in Qt directory, trying system path"
+            echo "macdeployqt not found in Qt directory: ${{env.Qt6_DIR}}/bin/"
+            echo "Looking for macdeployqt in PATH..."
+            which macdeployqt || echo "macdeployqt not found in PATH"
             if command -v macdeployqt &> /dev/null; then
-              echo "Found macdeployqt in system PATH"
+              echo "Found and using macdeployqt from PATH"
               macdeployqt HeroKill.app
             else
-              echo "ERROR: macdeployqt not found in PATH. Available in Qt directory: ${{env.Qt6_DIR}}/bin/"
-              echo "This suggests an issue with environment variable setup in the GitHub Actions runner."
+              echo "ERROR: macdeployqt not found anywhere"
+              echo "Available Qt tools in directory:"
               ls -la "${{env.Qt6_DIR}}/bin/" || echo "Qt bin directory not accessible"
               exit 1
             fi
