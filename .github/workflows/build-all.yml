@@ -138,7 +138,7 @@ jobs:
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
-          "${Qt6_DIR}/bin/macdeployqt" HeroKill.app
+          "${{env.Qt6_DIR}}/bin/macdeployqt" HeroKill.app
           cp ../fk_ver HeroKill.app/Contents/MacOS/
           cd ..
           hdiutil create -volname HeroKill -srcfolder HeroKill-macOS -ov -format UDZO \
