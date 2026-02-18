@@ -44,6 +44,20 @@ jobs:
           target: 'desktop'
           arch: 'clang_64'
           modules: 'qtmultimedia qtshadertools'
+      - name: Resolve Qt prefix
+        shell: bash
+        run: |
+          QT_PREFIX="${{ steps.qt.outputs.qt_dir }}"
+          if [ -z "$QT_PREFIX" ]; then QT_PREFIX="${{ steps.qt.outputs.dir }}"; fi
+          if [ -z "$QT_PREFIX" ] && [ -n "${QT_ROOT_DIR}" ]; then QT_PREFIX="${QT_ROOT_DIR}"; fi
+          if [ -z "$QT_PREFIX" ] && [ -n "${Qt6_DIR}" ]; then
+            QT_PREFIX="$(cd "${Qt6_DIR}/../../.." && pwd)"
+          fi
+          if [ -z "$QT_PREFIX" ]; then
+            echo "QT_PREFIX not found" >&2
+            exit 1
+          fi
+          echo "QT_PREFIX=${QT_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Cache native dependencies
         id: cache-deps
@@ -109,6 +123,7 @@ jobs:
 
       - name: Install cached deps to system
         run: |
+          sudo mkdir -p /usr/local/lib /usr/local/include
           sudo cp -a /tmp/deps/lib/* /usr/local/lib/
           sudo cp -a /tmp/deps/include/* /usr/local/include/
           if [ -d /tmp/deps/lib/pkgconfig ]; then
@@ -120,7 +135,7 @@ jobs:
         run: |
           cmake -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-                -DCMAKE_PREFIX_PATH="${{ steps.qt.outputs.dir }}" \
+                -DCMAKE_PREFIX_PATH="${QT_PREFIX}" \
                 -DOPENSSL_ROOT_DIR=/tmp/deps/ssl \
                 -B build
 
@@ -170,6 +185,20 @@ jobs:
           arch: 'win64_mingw'
           modules: 'qtmultimedia qtshadertools'
           tools: 'tools_opensslv3_x64 tools_mingw1310'
+      - name: Resolve Qt prefix
+        shell: bash
+        run: |
+          QT_PREFIX="${{ steps.qt.outputs.qt_dir }}"
+          if [ -z "$QT_PREFIX" ]; then QT_PREFIX="${{ steps.qt.outputs.dir }}"; fi
+          if [ -z "$QT_PREFIX" ] && [ -n "${QT_ROOT_DIR}" ]; then QT_PREFIX="${QT_ROOT_DIR}"; fi
+          if [ -z "$QT_PREFIX" ] && [ -n "${Qt6_DIR}" ]; then
+            QT_PREFIX="$(cd "${Qt6_DIR}/../../.." && pwd)"
+          fi
+          if [ -z "$QT_PREFIX" ]; then
+            echo "QT_PREFIX not found" >&2
+            exit 1
+          fi
+          echo "QT_PREFIX=${QT_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Disable PCH
         shell: bash
@@ -184,17 +213,37 @@ jobs:
       - name: Configure
         shell: bash
         run: |
-          QT_PREFIX="${{ steps.qt.outputs.dir }}"
           MINGW_DIR="${QT_PREFIX}/../../Tools/mingw1310_64/bin"
           OPENSSL_DIR="${QT_PREFIX}/../../Tools/OpenSSLv3/Win_x64"
           export CC="${MINGW_DIR}/gcc.exe"
           export CXX="${MINGW_DIR}/g++.exe"
           export RC="${MINGW_DIR}/windres.exe"
+          OPENSSL_CRYPTO_LIB=""
+          OPENSSL_SSL_LIB=""
+          for f in \
+            "${OPENSSL_DIR}/lib/libcrypto.a" \
+            "${OPENSSL_DIR}/lib/libcrypto-3-x64.dll.a" \
+            "${OPENSSL_DIR}/lib/libcrypto.dll.a" \
+            "${OPENSSL_DIR}/bin/libcrypto-3-x64.dll"; do
+            if [ -f "$f" ]; then OPENSSL_CRYPTO_LIB="$f"; break; fi
+          done
+          for f in \
+            "${OPENSSL_DIR}/lib/libssl.a" \
+            "${OPENSSL_DIR}/lib/libssl-3-x64.dll.a" \
+            "${OPENSSL_DIR}/lib/libssl.dll.a" \
+            "${OPENSSL_DIR}/bin/libssl-3-x64.dll"; do
+            if [ -f "$f" ]; then OPENSSL_SSL_LIB="$f"; break; fi
+          done
+          if [ -z "$OPENSSL_CRYPTO_LIB" ] || [ -z "$OPENSSL_SSL_LIB" ]; then
+            echo "OpenSSL libraries not found under ${OPENSSL_DIR}" >&2
+            exit 1
+          fi
           cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
                 -DCMAKE_PREFIX_PATH="${QT_PREFIX}" \
                 -DOPENSSL_ROOT_DIR="${OPENSSL_DIR}" \
                 -DOPENSSL_INCLUDE_DIR="${OPENSSL_DIR}/include" \
-                -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_DIR}/bin/libcrypto-3-x64.dll" \
+                -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_CRYPTO_LIB}" \
+                -DOPENSSL_SSL_LIBRARY="${OPENSSL_SSL_LIB}" \
                 -G "MinGW Makefiles" -B build
 
       - name: Build
@@ -204,7 +253,6 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          QT_PREFIX="${{ steps.qt.outputs.dir }}"
           mkdir HeroKill-release
           cp build/HeroKill.exe HeroKill-release
           cd HeroKill-release
@@ -307,6 +355,33 @@ jobs:
           target: 'android'
           arch: 'android_arm64_v8a'
           modules: 'qtmultimedia qtshadertools'
+      - name: Resolve Qt prefixes
+        shell: bash
+        run: |
+          QT_ANDROID_PREFIX="${{ steps.qt-android.outputs.qt_dir }}"
+          if [ -z "$QT_ANDROID_PREFIX" ]; then QT_ANDROID_PREFIX="${{ steps.qt-android.outputs.dir }}"; fi
+          if [ -z "$QT_ANDROID_PREFIX" ] && [ -n "${QT_ROOT_DIR}" ]; then QT_ANDROID_PREFIX="${QT_ROOT_DIR}"; fi
+          if [ -z "$QT_ANDROID_PREFIX" ] && [ -n "${Qt6_DIR}" ]; then
+            QT_ANDROID_PREFIX="$(cd "${Qt6_DIR}/../../.." && pwd)"
+          fi
+          if [ -z "$QT_ANDROID_PREFIX" ]; then
+            echo "QT_ANDROID_PREFIX not found" >&2
+            exit 1
+          fi
+
+          QT_HOST_PREFIX="${{ steps.qt-host.outputs.qt_dir }}"
+          if [ -z "$QT_HOST_PREFIX" ]; then QT_HOST_PREFIX="${{ steps.qt-host.outputs.dir }}"; fi
+          if [ -z "$QT_HOST_PREFIX" ] && [ -n "${QT_HOST_PATH}" ]; then QT_HOST_PREFIX="${QT_HOST_PATH}"; fi
+          if [ -z "$QT_HOST_PREFIX" ] && [ -d "$(dirname "$QT_ANDROID_PREFIX")/gcc_64" ]; then
+            QT_HOST_PREFIX="$(cd "$(dirname "$QT_ANDROID_PREFIX")/gcc_64" && pwd)"
+          fi
+          if [ -z "$QT_HOST_PREFIX" ]; then
+            echo "QT_HOST_PREFIX not found" >&2
+            exit 1
+          fi
+
+          echo "QT_PREFIX=${QT_ANDROID_PREFIX}" >> "$GITHUB_ENV"
+          echo "QT_HOST_PATH=${QT_HOST_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Prepare Android assets
         run: |
@@ -325,8 +400,8 @@ jobs:
       - name: Configure
         run: |
           # Qt6_DIR = <prefix>/lib/cmake/Qt6, 反推 Qt 前缀目录
-          QT_PREFIX="${{env.Qt6_DIR}}/../../.."
-          export QT_HOST_PATH="${QT_PREFIX}/../gcc_64/"
+          QT_PREFIX="${QT_PREFIX}"
+          export QT_HOST_PATH="${QT_HOST_PATH}"
           export ANDROID_SDK_ROOT=$(pwd)/../android
           export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
           export FK_ANDROID_SSL_DIR=$(pwd)/../openssl-3.1.8
