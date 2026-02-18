@@ -139,14 +139,20 @@ jobs:
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
           echo "Qt6_DIR is: $Qt6_DIR"
-          echo "Full path would be: $Qt6_DIR/bin/macdeployqt"
-          if [ -x "$Qt6_DIR/bin/macdeployqt" ]; then
-            echo "Using macdeployqt from Qt directory"
+          if [ -n "$Qt6_DIR" ] && [ -x "$Qt6_DIR/bin/macdeployqt" ]; then
+            echo "Using macdeployqt from Qt directory: $Qt6_DIR/bin/macdeployqt"
             "$Qt6_DIR/bin/macdeployqt" HeroKill.app
           else
-            echo "macdeployqt not found in Qt directory, trying system path"
-            which macdeployqt || echo "macdeployqt not found in PATH"
-            macdeployqt HeroKill.app
+            echo "Qt6_DIR is not set or macdeployqt not found in Qt directory, trying system path"
+            if command -v macdeployqt &> /dev/null; then
+              echo "Found macdeployqt in system PATH"
+              macdeployqt HeroKill.app
+            else
+              echo "ERROR: macdeployqt not found in PATH. Available in Qt directory: ${{env.Qt6_DIR}}/bin/"
+              echo "This suggests an issue with environment variable setup in the GitHub Actions runner."
+              ls -la "${{env.Qt6_DIR}}/bin/" || echo "Qt bin directory not accessible"
+              exit 1
+            fi
           fi
           cp ../fk_ver HeroKill.app/Contents/MacOS/
           cd ..
