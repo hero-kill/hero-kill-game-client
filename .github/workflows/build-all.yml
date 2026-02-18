@@ -117,9 +117,10 @@ jobs:
 
       - name: Configure
         run: |
+          QT_PREFIX="${Qt6_DIR}/../../.."
           cmake -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-                -DCMAKE_PREFIX_PATH=${{env.Qt6_Dir}} \
+                -DCMAKE_PREFIX_PATH="${QT_PREFIX}" \
                 -DOPENSSL_ROOT_DIR=/tmp/deps/ssl \
                 -B build
 
@@ -128,45 +129,11 @@ jobs:
 
       - name: Package
         run: |
-          # 检查构建输出，确保.app文件存在
-          echo "Checking build output..."
-          ls -la build/
-          
-          # 确保构建生成了.app包
-          if [ -d "build/HeroKill.app" ]; then
-            echo "Found HeroKill.app in build directory"
-          else
-            echo "Looking for .app file in build directory..."
-            find build -name "*.app" -type d || echo "No .app file found!"
-            ls -la build/ || echo "Build directory does not exist"
-          fi
-          
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
-          
-          # 检查Qt6_DIR环境变量
-          echo "Qt6_DIR environment variable: ${{env.Qt6_DIR}}"
-          echo "Qt6_DIR shell variable: $Qt6_DIR"
-          
-          # 使用GitHub Actions变量确保路径正确
-          if [ -x "${{env.Qt6_DIR}}/bin/macdeployqt" ]; then
-            echo "Using macdeployqt from Qt directory: ${{env.Qt6_DIR}}/bin/macdeployqt"
-            "${{env.Qt6_DIR}}/bin/macdeployqt" HeroKill.app
-          else
-            echo "macdeployqt not found in Qt directory: ${{env.Qt6_DIR}}/bin/"
-            echo "Looking for macdeployqt in PATH..."
-            which macdeployqt || echo "macdeployqt not found in PATH"
-            if command -v macdeployqt &> /dev/null; then
-              echo "Found and using macdeployqt from PATH"
-              macdeployqt HeroKill.app
-            else
-              echo "ERROR: macdeployqt not found anywhere"
-              echo "Available Qt tools in directory:"
-              ls -la "${{env.Qt6_DIR}}/bin/" || echo "Qt bin directory not accessible"
-              exit 1
-            fi
-          fi
+          # install-qt-action@v4 已将 Qt bin 目录加入 PATH
+          macdeployqt HeroKill.app
           cp ../fk_ver HeroKill.app/Contents/MacOS/
           cd ..
           hdiutil create -volname HeroKill -srcfolder HeroKill-macOS -ov -format UDZO \
@@ -216,13 +183,15 @@ jobs:
       - name: Configure
         shell: bash
         run: |
-          MINGW_DIR="${Qt6_Dir}/../../Tools/mingw1310_64/bin"
-          OPENSSL_DIR="${Qt6_Dir}/../../Tools/OpenSSLv3/Win_x64"
+          # Qt6_DIR = <prefix>/lib/cmake/Qt6, 反推 Qt 前缀目录
+          QT_PREFIX="${Qt6_DIR}/../../.."
+          MINGW_DIR="${QT_PREFIX}/../../Tools/mingw1310_64/bin"
+          OPENSSL_DIR="${QT_PREFIX}/../../Tools/OpenSSLv3/Win_x64"
           export CC="${MINGW_DIR}/gcc.exe"
           export CXX="${MINGW_DIR}/g++.exe"
           export RC="${MINGW_DIR}/windres.exe"
           cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
-                -DCMAKE_PREFIX_PATH="${Qt6_Dir}" \
+                -DCMAKE_PREFIX_PATH="${QT_PREFIX}" \
                 -DOPENSSL_ROOT_DIR="${OPENSSL_DIR}" \
                 -DOPENSSL_INCLUDE_DIR="${OPENSSL_DIR}/include" \
                 -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_DIR}/bin/libcrypto-3-x64.dll" \
@@ -235,6 +204,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
+          QT_PREFIX="${Qt6_DIR}/../../.."
           mkdir HeroKill-release
           cp build/HeroKill.exe HeroKill-release
           cd HeroKill-release
@@ -242,8 +212,8 @@ jobs:
           cd ..
           cp lib/win/* HeroKill-release
           cp fk_ver HeroKill-release
-          cp ../Qt/${{env.QT_VERSION}}/mingw_64/bin/li*.dll HeroKill-release
-          cp ../Qt/Tools/OpenSSLv3/Win_x64/bin/*.dll HeroKill-release
+          cp "${QT_PREFIX}/bin"/li*.dll HeroKill-release
+          cp "${QT_PREFIX}/../../Tools/OpenSSLv3/Win_x64/bin"/*.dll HeroKill-release
           7z a -t7z HeroKill-${{github.ref_name}}-Windows.7z HeroKill-release -r -mx=9 -m0=LZMA2 -ms=10m -mf=on -mhc=on -mmt=on
 
       - name: Upload artifact
@@ -352,12 +322,14 @@ jobs:
 
       - name: Configure
         run: |
-          export QT_HOST_PATH=${Qt6_DIR}/../gcc_64/
+          # Qt6_DIR = <prefix>/lib/cmake/Qt6, 反推 Qt 前缀目录
+          QT_PREFIX="${Qt6_DIR}/../../.."
+          export QT_HOST_PATH="${QT_PREFIX}/../gcc_64/"
           export ANDROID_SDK_ROOT=$(pwd)/../android
           export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
           export FK_ANDROID_SSL_DIR=$(pwd)/../openssl-3.1.8
           sed -i "s/LinguistTools/Linguist/g" CMakeLists.txt
-          ${Qt6_DIR}/bin/qt-cmake -S . -B ./build -DCMAKE_BUILD_TYPE=MinSizeRel
+          "${QT_PREFIX}/bin/qt-cmake" -S . -B ./build -DCMAKE_BUILD_TYPE=MinSizeRel
 
       - name: Build
         run: make -j2 -C build
