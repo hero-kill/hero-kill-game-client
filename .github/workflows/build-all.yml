@@ -6,6 +6,13 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   QT_VERSION: '6.10.0'
   LUA_VERSION: '5.4.7'
@@ -29,10 +36,8 @@ jobs:
         run: brew install swig
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: '==3.1.*'
-          py7zrversion: '>=0.20.2'
           version: ${{env.QT_VERSION}}
           host: 'mac'
           target: 'desktop'
@@ -43,17 +48,8 @@ jobs:
         id: cache-deps
         uses: actions/cache@v4
         with:
-          path: |
-            /usr/local/lib/liblua*
-            /usr/local/include/lua*
-            /usr/local/include/lauxlib.h
-            /usr/local/include/lualib.h
-            /usr/local/include/luaconf.h
-            /tmp/openssl-universal
-            /usr/local/lib/libgit2*
-            /usr/local/lib/pkgconfig/libgit2.pc
-            /usr/local/include/git2*
-          key: macos-deps-lua${{env.LUA_VERSION}}-ssl${{env.OPENSSL_VERSION}}-git2${{env.LIBGIT2_VERSION}}-v1
+          path: /tmp/deps
+          key: macos-deps-lua${{env.LUA_VERSION}}-ssl${{env.OPENSSL_VERSION}}-git2${{env.LIBGIT2_VERSION}}-v2
 
       - name: Build Lua (universal)
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -63,7 +59,7 @@ jobs:
           tar xf lua-${{env.LUA_VERSION}}.tar.gz
           cd lua-${{env.LUA_VERSION}}
           make macosx MYCFLAGS="-arch arm64 -arch x86_64" MYLDFLAGS="-arch arm64 -arch x86_64" -j$(sysctl -n hw.ncpu)
-          sudo make install
+          make install INSTALL_TOP=/tmp/deps
 
       - name: Build OpenSSL (universal)
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -84,12 +80,12 @@ jobs:
           make -j$(sysctl -n hw.ncpu) && make install_sw
           cd ..
 
-          mkdir -p /tmp/openssl-universal/lib
-          cp -r /tmp/openssl-arm64/include /tmp/openssl-universal/
+          mkdir -p /tmp/deps/ssl/lib
+          cp -r /tmp/openssl-arm64/include /tmp/deps/ssl/
           lipo -create /tmp/openssl-arm64/lib/libcrypto.a /tmp/openssl-x86_64/lib/libcrypto.a \
-            -output /tmp/openssl-universal/lib/libcrypto.a
+            -output /tmp/deps/ssl/lib/libcrypto.a
           lipo -create /tmp/openssl-arm64/lib/libssl.a /tmp/openssl-x86_64/lib/libssl.a \
-            -output /tmp/openssl-universal/lib/libssl.a
+            -output /tmp/deps/ssl/lib/libssl.a
 
       - name: Build libgit2 (universal)
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -104,17 +100,27 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DBUILD_CLI=OFF \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/tmp/deps \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DOPENSSL_ROOT_DIR=/tmp/openssl-universal
+            -DOPENSSL_ROOT_DIR=/tmp/deps/ssl
           make -j$(sysctl -n hw.ncpu)
-          sudo make install
+          make install
+
+      - name: Install cached deps to system
+        run: |
+          sudo cp -a /tmp/deps/lib/* /usr/local/lib/
+          sudo cp -a /tmp/deps/include/* /usr/local/include/
+          if [ -d /tmp/deps/lib/pkgconfig ]; then
+            sudo mkdir -p /usr/local/lib/pkgconfig
+            sudo cp -a /tmp/deps/lib/pkgconfig/* /usr/local/lib/pkgconfig/
+          fi
 
       - name: Configure
         run: |
           cmake -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
                 -DCMAKE_PREFIX_PATH=${{env.Qt6_Dir}} \
-                -DOPENSSL_ROOT_DIR=/tmp/openssl-universal \
+                -DOPENSSL_ROOT_DIR=/tmp/deps/ssl \
                 -B build
 
       - name: Build
@@ -188,10 +194,8 @@ jobs:
         run: choco install swig -y
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: '==3.1.*'
-          py7zrversion: '>=0.20.2'
           version: ${{env.QT_VERSION}}
           host: 'windows'
           target: 'desktop'
@@ -210,15 +214,19 @@ jobs:
           sed -i '/pch.h/d' CMakeLists.txt
 
       - name: Configure
+        shell: bash
+        run: |
+          OPENSSL_DIR="${Qt6_Dir}/../../Tools/OpenSSLv3/Win_x64"
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                -DCMAKE_PREFIX_PATH="${Qt6_Dir}" \
+                -DOPENSSL_ROOT_DIR="${OPENSSL_DIR}" \
+                -DOPENSSL_INCLUDE_DIR="${OPENSSL_DIR}/include" \
+                -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_DIR}/bin/libcrypto-3-x64.dll" \
+                -G "MinGW Makefiles" -B build
         env:
-          CMAKE_PREFIX_PATH: ${{env.Qt6_Dir}}
           CC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/gcc.exe
           CXX: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/g++.exe
           RC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/windres.exe
-          OPENSSL_ROOT_DIR: ${{env.Qt6_Dir}}/../../Tools/OpenSSLv3/Win_x64
-          OPENSSL_INCLUDE_DIR: ${{env.OPENSSL_ROOT_DIR}}/include
-          OPENSSL_CRYPTO_LIBRARY: ${{env.OPENSSL_ROOT_DIR}}/bin/libcrypto-3-x64.dll
-        run: cmake -DCMAKE_BUILD_TYPE=MinSizeRel -G "MinGW Makefiles" -B build
 
       - name: Build
         working-directory: build
@@ -311,10 +319,8 @@ jobs:
         run: sudo apt-get install -y swig
 
       - name: Install Qt (Host)
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: '==3.1.*'
-          py7zrversion: '>=0.20.2'
           version: ${{env.QT_VERSION}}
           host: 'linux'
           target: 'desktop'
@@ -322,10 +328,8 @@ jobs:
           modules: 'qtmultimedia qtshadertools'
 
       - name: Install Qt (Android)
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
-          aqtversion: '==3.1.*'
-          py7zrversion: '>=0.20.2'
           version: ${{env.QT_VERSION}}
           host: 'linux'
           target: 'android'
@@ -378,23 +382,31 @@ jobs:
         with:
           path: artifacts
 
+      - name: Setup Android SDK for signing
+        uses: android-actions/setup-android@v3
+
       - name: Sign Android APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: artifacts/android
-          signingKeyBase64: ${{ secrets.KEY_STORE }}
-          alias: ${{ secrets.KEY_STORE_ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "35.0.0"
+        shell: bash
+        run: |
+          echo "${{ secrets.KEY_STORE }}" | base64 -d > keystore.jks
+          APK=$(find artifacts/android -name '*.apk' | head -1)
+          # Align
+          zipalign -v -p 4 "$APK" aligned.apk
+          # Sign
+          apksigner sign \
+            --ks keystore.jks \
+            --ks-key-alias "${{ secrets.KEY_STORE_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.KEY_STORE_PASSWORD }}" \
+            --out "artifacts/android/signed.apk" \
+            aligned.apk
+          rm -f keystore.jks aligned.apk
 
       - name: Prepare release files
         run: |
           mkdir release
           cp artifacts/macos/*.dmg release/
           cp artifacts/windows/*.7z release/
-          mv ${{ steps.sign_app.outputs.signedReleaseFile }} \
+          mv artifacts/android/signed.apk \
             release/HeroKill-${{github.ref_name}}-Android.apk
 
       - name: Create GitHub Release
