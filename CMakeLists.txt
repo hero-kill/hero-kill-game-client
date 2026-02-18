@@ -35,10 +35,13 @@ endif()
 set(CMAKE_COLOR_DIAGNOSTICS ON)
 
 find_package(OpenSSL)
-find_package(Lua)
-find_package(SQLite3)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBGIT2 REQUIRED libgit2)
+
+if (NOT WIN32 AND NOT ANDROID)
+  find_package(Lua)
+  find_package(SQLite3)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LIBGIT2 REQUIRED libgit2)
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)

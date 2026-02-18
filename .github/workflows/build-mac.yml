@@ -17,9 +17,9 @@ jobs:
         with:
           submodules: true
 
-      - name: Install swig
+      - name: Install dependencies
         run: |
-          brew install swig
+          brew install swig lua openssl@3
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
@@ -32,11 +32,7 @@ jobs:
           arch: 'clang_64'
           modules: 'qtmultimedia qtshadertools'
 
-      - name: Setup OpenSSL
-        run: |
-          brew install openssl@3
-
-      - name: Build libgit2 1.9.0
+      - name: Build and install libgit2 1.9.0
         run: |
           cd ..
           git clone https://github.com/libgit2/libgit2
@@ -52,6 +48,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)
           make -j$(sysctl -n hw.ncpu)
+          sudo make install
 
       - name: Configure CMake Project
         working-directory: ${{github.workspace}}
@@ -93,9 +90,9 @@ jobs:
         with:
           submodules: true
 
-      - name: Install swig
+      - name: Install dependencies
         run: |
-          brew install swig
+          brew install swig lua openssl@3
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
@@ -108,11 +105,7 @@ jobs:
           arch: 'clang_64'
           modules: 'qtmultimedia qtshadertools'
 
-      - name: Setup OpenSSL
-        run: |
-          brew install openssl@3
-
-      - name: Build libgit2 1.9.0
+      - name: Build and install libgit2 1.9.0
         run: |
           cd ..
           git clone https://github.com/libgit2/libgit2
@@ -128,6 +121,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=x86_64 \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)
           make -j$(sysctl -n hw.ncpu)
+          sudo make install
 
       - name: Configure CMake Project
         working-directory: ${{github.workspace}}
