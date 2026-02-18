@@ -122,6 +122,19 @@ jobs:
 
       - name: Package
         run: |
+          # 检查构建输出，确保.app文件存在
+          echo "Checking build output..."
+          ls -la build/
+          
+          # 确保构建生成了.app包
+          if [ -d "build/HeroKill.app" ]; then
+            echo "Found HeroKill.app in build directory"
+          else
+            echo "Looking for .app file in build directory..."
+            find build -name "*.app" -type d || echo "No .app file found!"
+            ls -la build/ || echo "Build directory does not exist"
+          fi
+          
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS

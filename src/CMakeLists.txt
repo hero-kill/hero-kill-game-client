@@ -88,6 +88,22 @@ elseif (APPLE)
   set(READLINE_LIB readline)
   set(GIT_LIB ${LIBGIT2_LIBRARIES})
   target_link_directories(HeroKill PRIVATE ${LIBGIT2_LIBRARY_DIRS})
+  
+  # 设置macOS特定属性以生成.app包
+  set_target_properties(HeroKill PROPERTIES
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.herokill.game
+    MACOSX_BUNDLE_BUNDLE_NAME HeroKill
+    MACOSX_BUNDLE_BUNDLE_VERSION ${CMAKE_PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${CMAKE_PROJECT_VERSION}
+  )
+  
+  # 添加图标到macOS bundle
+  set(MACOSX_BUNDLE_ICON_FILE icon.png)
+  set_source_files_properties(${PROJECT_SOURCE_DIR}/image/icon.png PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources"
+  )
+  target_sources(HeroKill PRIVATE ${PROJECT_SOURCE_DIR}/image/icon.png)
 else ()
   set(LUA_LIB lua5.4)
   set(SQLITE3_LIB sqlite3)

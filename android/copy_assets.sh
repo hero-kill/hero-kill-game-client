@@ -6,7 +6,7 @@ rm -rf res/mipmap assets
 if [ ! -e res/mipmap ]; then
   mkdir -p res/mipmap
 fi
-cp ../image/1icon.png res/mipmap
+cp ../image/icon.png res/mipmap
 
 if [ ! -e assets/res ]; then
   mkdir -p assets/res
