@@ -216,17 +216,17 @@ jobs:
       - name: Configure
         shell: bash
         run: |
+          MINGW_DIR="${Qt6_Dir}/../../Tools/mingw1310_64/bin"
           OPENSSL_DIR="${Qt6_Dir}/../../Tools/OpenSSLv3/Win_x64"
+          export CC="${MINGW_DIR}/gcc.exe"
+          export CXX="${MINGW_DIR}/g++.exe"
+          export RC="${MINGW_DIR}/windres.exe"
           cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
                 -DCMAKE_PREFIX_PATH="${Qt6_Dir}" \
                 -DOPENSSL_ROOT_DIR="${OPENSSL_DIR}" \
                 -DOPENSSL_INCLUDE_DIR="${OPENSSL_DIR}/include" \
                 -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_DIR}/bin/libcrypto-3-x64.dll" \
                 -G "MinGW Makefiles" -B build
-        env:
-          CC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/gcc.exe
-          CXX: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/g++.exe
-          RC: ${{env.Qt6_Dir}}/../../Tools/mingw1310_64/bin/windres.exe
 
       - name: Build
         working-directory: build
@@ -388,11 +388,13 @@ jobs:
       - name: Sign Android APK
         shell: bash
         run: |
+          # build-tools 不在 PATH 中，需要手动添加
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          export PATH="${BUILD_TOOLS_DIR}:$PATH"
+
           echo "${{ secrets.KEY_STORE }}" | base64 -d > keystore.jks
           APK=$(find artifacts/android -name '*.apk' | head -1)
-          # Align
           zipalign -v -p 4 "$APK" aligned.apk
-          # Sign
           apksigner sign \
             --ks keystore.jks \
             --ks-key-alias "${{ secrets.KEY_STORE_ALIAS }}" \
