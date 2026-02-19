@@ -76,3 +76,4 @@ HeroKill-wrap.cxx
 .ace-tool/
 ./packages/herokill-core/**
 /hero-kill-game-client.iml
+/keystore.jks

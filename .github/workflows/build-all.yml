@@ -460,7 +460,11 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "${{ secrets.KEY_STORE }}" | tr -d '\r' | base64 --decode > keystore.jks
+          KEYSTORE_B64=$(printf '%s' "${{ secrets.KEY_STORE }}" | tr -d '\r\n ')
+          if ! printf '%s' "${KEYSTORE_B64}" | base64 --decode > keystore.jks; then
+            echo "KEY_STORE is not valid base64. Re-create with: base64 -w0 keystore.jks" >&2
+            exit 1
+          fi
           APK=$(find artifacts/android -name '*.apk' | head -1)
           if [ -z "$APK" ]; then
             echo "No APK found under artifacts/android" >&2
