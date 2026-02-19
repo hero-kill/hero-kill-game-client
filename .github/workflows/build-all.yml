@@ -447,8 +447,25 @@ jobs:
           BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
           export PATH="${BUILD_TOOLS_DIR}:$PATH"
 
-          echo "${{ secrets.KEY_STORE }}" | base64 -d > keystore.jks
+          if [ -z "${{ secrets.KEY_STORE }}" ]; then
+            echo "Missing KEY_STORE secret" >&2
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_STORE_ALIAS }}" ]; then
+            echo "Missing KEY_STORE_ALIAS secret" >&2
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_STORE_PASSWORD }}" ]; then
+            echo "Missing KEY_STORE_PASSWORD secret" >&2
+            exit 1
+          fi
+
+          printf '%s' "${{ secrets.KEY_STORE }}" | tr -d '\r' | base64 --decode > keystore.jks
           APK=$(find artifacts/android -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then
+            echo "No APK found under artifacts/android" >&2
+            exit 1
+          fi
           zipalign -v -p 4 "$APK" aligned.apk
           apksigner sign \
             --ks keystore.jks \
