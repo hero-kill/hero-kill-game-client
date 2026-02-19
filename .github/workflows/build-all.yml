@@ -18,6 +18,11 @@ env:
   LUA_VERSION: '5.4.7'
   OPENSSL_VERSION: '3.4.1'
   LIBGIT2_VERSION: '1.9.0'
+  ANDROID_PLATFORM: '35'
+  ANDROID_BUILD_TOOLS: '35.0.0'
+  ANDROID_NDK_VERSION: '27.2.12479018'
+  # bump to invalidate all caches in one go
+  CACHE_VERSION: 'v1'
 
 jobs:
   # ─────────────────────────────────────────────
@@ -34,6 +39,14 @@ jobs:
 
       - name: Install build tools
         run: brew install swig
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: Qt
+          key: macos-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            macos-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}-
 
       - name: Install Qt
         id: qt
@@ -64,7 +77,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/deps
-          key: macos-deps-lua${{env.LUA_VERSION}}-ssl${{env.OPENSSL_VERSION}}-git2${{env.LIBGIT2_VERSION}}-v2
+          key: macos-deps-lua${{env.LUA_VERSION}}-ssl${{env.OPENSSL_VERSION}}-git2${{env.LIBGIT2_VERSION}}-${{ env.CACHE_VERSION }}
 
       - name: Build Lua (universal)
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -181,6 +194,14 @@ jobs:
       - name: Install swig
         run: choco install swig -y
 
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: Qt
+          key: windows-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            windows-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}-
+
       - name: Install Qt
         id: qt
         uses: jurplel/install-qt-action@v4
@@ -288,56 +309,101 @@ jobs:
         with:
           submodules: true
 
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: Qt
+          key: linux-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            linux-qt-${{ env.QT_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: android-sdk
+          key: linux-android-sdk-${{ env.ANDROID_PLATFORM }}-${{ env.ANDROID_BUILD_TOOLS }}-${{ env.ANDROID_NDK_VERSION }}-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            linux-android-sdk-${{ env.ANDROID_PLATFORM }}-${{ env.ANDROID_BUILD_TOOLS }}-${{ env.CACHE_VERSION }}-
+
+      - name: Cache Android OpenSSL
+        uses: actions/cache@v4
+        with:
+          path: openssl-3.1.8
+          key: linux-android-openssl-3.1.8-${{ env.CACHE_VERSION }}
+
+      - name: Cache Android libgit2
+        uses: actions/cache@v4
+        with:
+          path: libgit2-android
+          key: linux-android-libgit2-${{ env.LIBGIT2_VERSION }}-${{ env.ANDROID_NDK_VERSION }}-${{ env.CACHE_VERSION }}
+          restore-keys: |
+            linux-android-libgit2-${{ env.LIBGIT2_VERSION }}-${{ env.ANDROID_NDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
       - name: Setup Android SDK/NDK
         run: |
-          cd ..
-          mkdir android && cd android
+          SDK_ROOT="${GITHUB_WORKSPACE}/android-sdk"
+          mkdir -p "$SDK_ROOT"
+          cd "$SDK_ROOT"
           wget --quiet https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
           unzip commandlinetools-linux-9477386_latest.zip
-          yes | ./cmdline-tools/bin/sdkmanager --sdk_root=$(pwd) \
-            "platforms;android-35" \
+          yes | ./cmdline-tools/bin/sdkmanager --sdk_root="$SDK_ROOT" \
+            "platforms;android-${{ env.ANDROID_PLATFORM }}" \
             "platform-tools" \
-            "build-tools;35.0.0" \
-            "ndk;27.2.12479018"
+            "build-tools;${{ env.ANDROID_BUILD_TOOLS }}" \
+            "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
 
       - name: Setup OpenSSL for Android
         run: |
-          cd ..
-          wget --quiet https://github.com/openssl/openssl/releases/download/openssl-3.1.8/openssl-3.1.8.tar.gz
-          tar xf openssl-3.1.8.tar.gz
-          cd openssl-3.1.8
-          git clone https://github.com/KDAB/android_openssl
-          rm -rf include
-          cp -r android_openssl/ssl_3/include .
-          cp -r android_openssl/ssl_3/arm64-v8a/libcrypto_3.so .
-          cp -r android_openssl/ssl_3/arm64-v8a/libssl_3.so .
+          if [ ! -d ../openssl-3.1.8 ]; then
+            cd ..
+            wget --quiet https://github.com/openssl/openssl/releases/download/openssl-3.1.8/openssl-3.1.8.tar.gz
+            tar xf openssl-3.1.8.tar.gz
+            cd openssl-3.1.8
+            git clone https://github.com/KDAB/android_openssl
+            rm -rf include
+            cp -r android_openssl/ssl_3/include .
+            cp -r android_openssl/ssl_3/arm64-v8a/libcrypto_3.so .
+            cp -r android_openssl/ssl_3/arm64-v8a/libssl_3.so .
+          else
+            cd ..
+            cd openssl-3.1.8
+          fi
           cd ../hero-kill-game-client
           cp -r ../openssl-3.1.8/include/openssl ./include
 
       - name: Build libgit2 for Android
         run: |
-          cd ..
-          git clone https://github.com/libgit2/libgit2
-          cd libgit2
-          git checkout v${{env.LIBGIT2_VERSION}}
-          mkdir build && cd build
-          export ANDROID_SDK_ROOT=$(pwd)/../../android
-          export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
-          PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-          SSL_DIR=$(pwd)/../../openssl-3.1.8
-          cmake .. \
-            -DBUILD_SHARED_LIBS=ON \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_CLI=OFF \
-            -DCMAKE_SYSTEM_NAME=Android \
-            -DCMAKE_SYSTEM_VERSION=29 \
-            -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
-            -DCMAKE_ANDROID_NDK=${ANDROID_NDK_ROOT} \
-            -DOPENSSL_INCLUDE_DIR="${SSL_DIR}/include" \
-            -DOPENSSL_CRYPTO_LIBRARY="${SSL_DIR}/libcrypto_3.so" \
-            -DOPENSSL_SSL_LIBRARY="${SSL_DIR}/libssl_3.so"
-          make -j$(nproc)
-          cp libgit2.so ${SSL_DIR}
+          if [ -f ../libgit2-android/libgit2.so ]; then
+            echo "Using cached libgit2.so"
+          else
+            cd ..
+            git clone https://github.com/libgit2/libgit2
+            cd libgit2
+            git checkout v${{env.LIBGIT2_VERSION}}
+            mkdir build && cd build
+            export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
+            export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
+            PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+            SSL_DIR=$(pwd)/../../openssl-3.1.8
+            cmake .. \
+              -DBUILD_SHARED_LIBS=ON \
+              -DBUILD_TESTS=OFF \
+              -DBUILD_CLI=OFF \
+              -DCMAKE_SYSTEM_NAME=Android \
+              -DCMAKE_SYSTEM_VERSION=29 \
+              -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+              -DCMAKE_ANDROID_NDK=${ANDROID_NDK_ROOT} \
+              -DOPENSSL_INCLUDE_DIR="${SSL_DIR}/include" \
+              -DOPENSSL_CRYPTO_LIBRARY="${SSL_DIR}/libcrypto_3.so" \
+              -DOPENSSL_SSL_LIBRARY="${SSL_DIR}/libssl_3.so"
+            make -j$(nproc)
+            cd ..
+            mkdir -p libgit2-android
+            cp libgit2/build/libgit2.so libgit2-android/
+          fi
+          cp ../libgit2-android/libgit2.so ../openssl-3.1.8
 
       - name: Install swig
         run: sudo apt-get install -y swig
@@ -408,8 +474,8 @@ jobs:
           # Qt6_DIR = <prefix>/lib/cmake/Qt6, 反推 Qt 前缀目录
           QT_PREFIX="${QT_PREFIX}"
           export QT_HOST_PATH="${QT_HOST_PATH}"
-          export ANDROID_SDK_ROOT=$(pwd)/../android
-          export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
+          export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
           export FK_ANDROID_SSL_DIR=$(pwd)/../openssl-3.1.8
           sed -i "s/LinguistTools/Linguist/g" CMakeLists.txt
           "${QT_PREFIX}/bin/qt-cmake" -S . -B ./build -DCMAKE_BUILD_TYPE=MinSizeRel
