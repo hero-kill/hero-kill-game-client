@@ -356,37 +356,38 @@ jobs:
 
       - name: Setup OpenSSL for Android
         run: |
-          if [ ! -d ../openssl-3.1.8 ]; then
-            cd ..
+          OPENSSL_DIR="${GITHUB_WORKSPACE}/openssl-3.1.8"
+          if [ ! -d "${OPENSSL_DIR}" ]; then
+            cd "${GITHUB_WORKSPACE}"
             wget --quiet https://github.com/openssl/openssl/releases/download/openssl-3.1.8/openssl-3.1.8.tar.gz
             tar xf openssl-3.1.8.tar.gz
-            cd openssl-3.1.8
+            cd "${OPENSSL_DIR}"
             git clone https://github.com/KDAB/android_openssl
             rm -rf include
             cp -r android_openssl/ssl_3/include .
             cp -r android_openssl/ssl_3/arm64-v8a/libcrypto_3.so .
             cp -r android_openssl/ssl_3/arm64-v8a/libssl_3.so .
-          else
-            cd ..
-            cd openssl-3.1.8
           fi
-          cd ../hero-kill-game-client
-          cp -r ../openssl-3.1.8/include/openssl ./include
+          cd "${GITHUB_WORKSPACE}"
+          cp -r "${OPENSSL_DIR}/include/openssl" ./include
 
       - name: Build libgit2 for Android
         run: |
-          if [ -f ../libgit2-android/libgit2.so ]; then
+          LIBGIT2_CACHE="${GITHUB_WORKSPACE}/libgit2-android"
+          OPENSSL_DIR="${GITHUB_WORKSPACE}/openssl-3.1.8"
+          if [ -f "${LIBGIT2_CACHE}/libgit2.so" ]; then
             echo "Using cached libgit2.so"
           else
-            cd ..
-            git clone https://github.com/libgit2/libgit2
-            cd libgit2
+            LIBGIT2_SRC="${RUNNER_TEMP:-/tmp}/libgit2"
+            rm -rf "${LIBGIT2_SRC}"
+            git clone https://github.com/libgit2/libgit2 "${LIBGIT2_SRC}"
+            cd "${LIBGIT2_SRC}"
             git checkout v${{env.LIBGIT2_VERSION}}
             mkdir build && cd build
             export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
             export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
             PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
-            SSL_DIR=$(pwd)/../../openssl-3.1.8
+            SSL_DIR="${OPENSSL_DIR}"
             cmake .. \
               -DBUILD_SHARED_LIBS=ON \
               -DBUILD_TESTS=OFF \
@@ -399,11 +400,15 @@ jobs:
               -DOPENSSL_CRYPTO_LIBRARY="${SSL_DIR}/libcrypto_3.so" \
               -DOPENSSL_SSL_LIBRARY="${SSL_DIR}/libssl_3.so"
             make -j$(nproc)
-            cd ..
-            mkdir -p libgit2-android
-            cp libgit2/build/libgit2.so libgit2-android/
+            mkdir -p "${LIBGIT2_CACHE}"
+            LIBGIT2_SO=$(find "${LIBGIT2_SRC}/build" -name 'libgit2.so' -print -quit)
+            if [ -z "${LIBGIT2_SO}" ]; then
+              echo "libgit2.so not found in build output" >&2
+              exit 1
+            fi
+            cp "${LIBGIT2_SO}" "${LIBGIT2_CACHE}/"
           fi
-          cp ../libgit2-android/libgit2.so ../openssl-3.1.8
+          cp "${LIBGIT2_CACHE}/libgit2.so" "${OPENSSL_DIR}"
 
       - name: Install swig
         run: sudo apt-get install -y swig
@@ -476,7 +481,7 @@ jobs:
           export QT_HOST_PATH="${QT_HOST_PATH}"
           export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
           export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}
-          export FK_ANDROID_SSL_DIR=$(pwd)/../openssl-3.1.8
+          export FK_ANDROID_SSL_DIR="${GITHUB_WORKSPACE}/openssl-3.1.8"
           sed -i "s/LinguistTools/Linguist/g" CMakeLists.txt
           "${QT_PREFIX}/bin/qt-cmake" -S . -B ./build -DCMAKE_BUILD_TYPE=MinSizeRel
 
