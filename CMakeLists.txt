@@ -87,3 +87,44 @@ if (DEFINED FK_TESTS)
 enable_testing()
 add_subdirectory(test)
 endif ()
+
+if (APPLE)
+  # 将资源拷贝到 .app/Contents/Resources，保证本地 .app 可直接运行
+  add_custom_command(TARGET HeroKill POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      "$<TARGET_BUNDLE_DIR:HeroKill>/Contents/Resources"
+  )
+
+  set(MACOS_RESOURCE_DIRS
+    "${PROJECT_SOURCE_DIR}/audio"
+    "${PROJECT_SOURCE_DIR}/fonts"
+    "${PROJECT_SOURCE_DIR}/image"
+    "${PROJECT_SOURCE_DIR}/packages"
+    "${PROJECT_SOURCE_DIR}/client"
+    "${PROJECT_SOURCE_DIR}/lua"
+  )
+  foreach(res_dir IN LISTS MACOS_RESOURCE_DIRS)
+    if(EXISTS "${res_dir}")
+      get_filename_component(res_name "${res_dir}" NAME)
+      add_custom_command(TARGET HeroKill POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${res_dir}"
+          "$<TARGET_BUNDLE_DIR:HeroKill>/Contents/Resources/${res_name}"
+      )
+    endif()
+  endforeach()
+
+  set(MACOS_RESOURCE_FILES
+    "${PROJECT_SOURCE_DIR}/fk_ver"
+    "${PROJECT_SOURCE_DIR}/waiting_tips.txt"
+  )
+  foreach(res_file IN LISTS MACOS_RESOURCE_FILES)
+    if(EXISTS "${res_file}")
+      add_custom_command(TARGET HeroKill POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${res_file}"
+          "$<TARGET_BUNDLE_DIR:HeroKill>/Contents/Resources"
+      )
+    endif()
+  endforeach()
+endif()

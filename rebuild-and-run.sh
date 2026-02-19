@@ -27,4 +27,8 @@ cd ../
 echo "=== 编译完成，启动客户端 ==="
 
 # 运行客户端
-./build/HeroKill
+if [[ "$OSTYPE" == "darwin"* && -d "./build/HeroKill.app" ]]; then
+  open "./build/HeroKill.app"
+else
+  ./build/HeroKill
+fi

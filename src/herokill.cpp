@@ -26,9 +26,11 @@ using namespace fkShell;
  #include "network/data_service_proxy.h"
 #endif
 
+#include <QDir>
+#include <QFileInfo>
 #include <QTextStream>
 
-#if defined(Q_OS_ANDROID)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_MACOS)
 static bool copyPath(const QString &srcFilePath, const QString &tgtFilePath) {
   QFileInfo srcFileInfo(srcFilePath);
   if (srcFileInfo.isDir()) {
@@ -65,7 +67,7 @@ static void installFkAssets(const QString &src, const QString &dest) {
       return;
     }
   }
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_MACOS)
   copyPath(src, dest);
 #elif defined(Q_OS_LINUX)
   system(QString("cp -r %1 %2/..").arg(src).arg(dest).toUtf8());
@@ -92,6 +94,57 @@ static void prepareForLinux() {
     installFkAssets("/usr/local/share/HeroKill", QString("%1/.local/share/HeroKill").arg(home));
     chdir(home);
     chdir(".local/share/HeroKill");
+  }
+}
+#endif
+
+#if defined(Q_OS_MACOS)
+static bool isMacBundlePath(const QString &path) {
+  return path.contains(".app/Contents/MacOS");
+}
+
+static QString findDevRoot(const QString &startDir) {
+  QDir dir(startDir);
+  for (int i = 0; i < 6; ++i) {
+    if (QFileInfo(dir.filePath("packages/herokill-core")).exists() &&
+        QFileInfo(dir.filePath("image/splash.png")).exists()) {
+      return dir.absolutePath();
+    }
+    if (!dir.cdUp()) {
+      break;
+    }
+  }
+  return QString();
+}
+
+static void prepareForMac(const QString &execPath) {
+  QFileInfo execInfo(execPath);
+  QString execDir = execInfo.absolutePath();
+  if (!isMacBundlePath(execDir)) {
+    return;
+  }
+
+  QString dataDir =
+      QDir::homePath() + "/Library/Application Support/HeroKill";
+  if (dataDir.isEmpty()) {
+    return;
+  }
+
+  QDir().mkpath(dataDir);
+  QString resDir = QDir::cleanPath(QDir(execDir).filePath("../Resources"));
+  bool hasBundleAssets =
+      QFileInfo(resDir + "/packages/herokill-core").exists() &&
+      QFileInfo(resDir + "/image/splash.png").exists();
+  if (hasBundleAssets) {
+    installFkAssets(resDir, dataDir);
+    QDir::setCurrent(dataDir);
+    return;
+  }
+
+  QString devRoot = findDevRoot(execDir);
+  if (!devRoot.isEmpty()) {
+    QDir::setCurrent(devRoot);
+    return;
   }
 }
 #endif
@@ -225,13 +278,14 @@ int herokill_main(int argc, char *argv[]) {
   // 初始化一下各种杂项信息
   QThread::currentThread()->setObjectName("Main");
 
-  qInstallMessageHandler(fkMsgHandler);
   QCoreApplication *app;
   QCoreApplication::setApplicationName("HeroKill");
   QCoreApplication::setApplicationVersion(FK_VERSION);
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
   prepareForLinux();
+#elif defined(Q_OS_MACOS)
+  prepareForMac(QString::fromLocal8Bit(argv[0]));
 #endif
 
   if (!log_file) {
@@ -240,6 +294,7 @@ int herokill_main(int argc, char *argv[]) {
       qFatal("Cannot open info.log");
     }
   }
+  qInstallMessageHandler(fkMsgHandler);
 
   // 分析命令行，如果有 -s 或者 --server 就在命令行直接开服务器
   QCommandLineParser parser;

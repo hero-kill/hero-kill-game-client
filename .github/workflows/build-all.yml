@@ -147,8 +147,14 @@ jobs:
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
           cd HeroKill-macOS
+          RES_DIR="HeroKill.app/Contents/Resources"
+          mkdir -p "$RES_DIR"
+          cp -R ../audio ../fonts ../image ../packages ../client "$RES_DIR"
+          if [ -d ../lua ]; then cp -R ../lua "$RES_DIR"; fi
+          if [ -f ../waiting_tips.txt ]; then cp ../waiting_tips.txt "$RES_DIR"; fi
+          cp ../fk_ver "$RES_DIR"
           # install-qt-action@v4 已将 Qt bin 目录加入 PATH
-          macdeployqt HeroKill.app
+          macdeployqt HeroKill.app -qmldir="$RES_DIR"
           cp ../fk_ver HeroKill.app/Contents/MacOS/
           cd ..
           hdiutil create -volname HeroKill -srcfolder HeroKill-macOS -ov -format UDZO \
