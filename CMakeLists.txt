@@ -127,4 +127,12 @@ if (APPLE)
       )
     endif()
   endforeach()
+
+  # 额外导出一个非 .app 的可执行文件，便于直接 ./build/HeroKill 运行
+  add_custom_command(TARGET HeroKill POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "$<TARGET_BUNDLE_DIR:HeroKill>/Contents/MacOS/HeroKill"
+      "${PROJECT_BINARY_DIR}/HeroKill"
+    COMMENT "Export standalone HeroKill binary"
+  )
 endif()

@@ -159,6 +159,7 @@ jobs:
         run: |
           mkdir -p HeroKill-macOS
           cp -r build/HeroKill.app HeroKill-macOS/
+          if [ -f build/HeroKill ]; then cp build/HeroKill HeroKill-macOS/; fi
           cd HeroKill-macOS
           RES_DIR="HeroKill.app/Contents/Resources"
           mkdir -p "$RES_DIR"
