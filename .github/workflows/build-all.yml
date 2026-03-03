@@ -42,6 +42,7 @@ jobs:
           mkdir -p packages
           cd packages
           git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
+          rm -rf herokill-core/.git
 
       - name: Install build tools
         run: brew install swig
@@ -331,6 +332,7 @@ jobs:
           mkdir -p packages
           cd packages
           git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
+          rm -rf herokill-core/.git
 
       - name: Cache Qt
         uses: actions/cache@v4
