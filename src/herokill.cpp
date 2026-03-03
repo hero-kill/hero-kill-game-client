@@ -286,6 +286,13 @@ int herokill_main(int argc, char *argv[]) {
   prepareForLinux();
 #elif defined(Q_OS_MACOS)
   prepareForMac(QString::fromLocal8Bit(argv[0]));
+#elif defined(Q_OS_WIN32)
+  // Windows: 切换到程序所在目录，避免中文用户名路径问题
+  QFileInfo execInfo(QString::fromLocal8Bit(argv[0]));
+  QString execDir = execInfo.absolutePath();
+  if (!execDir.isEmpty()) {
+    QDir::setCurrent(execDir);
+  }
 #endif
 
   if (!log_file) {
@@ -454,8 +461,10 @@ int herokill_main(int argc, char *argv[]) {
       "AppPath", QUrl::fromLocalFile(QDir::currentPath()));
 
   // 加载GUI了，如果core有的话用core的
-  engine->addImportPath("packages/herokill-core");
-  engine->load("packages/herokill-core/Fk/main.qml");
+  // 使用绝对路径加载 QML，避免中文路径等编码问题
+  QString currentDir = QDir::currentPath();
+  engine->addImportPath(currentDir + "/packages/herokill-core");
+  engine->load(QUrl::fromLocalFile(currentDir + "/packages/herokill-core/Fk/main.qml"));
 
   // qml 报错了就直接退出吧
   if (engine->rootObjects().isEmpty())

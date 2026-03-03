@@ -286,6 +286,9 @@ jobs:
           cd HeroKill-release
           windeployqt HeroKill.exe
           cd ..
+          cp -r audio fonts image packages client HeroKill-release/
+          if [ -d lua ]; then cp -r lua HeroKill-release/; fi
+          if [ -f waiting_tips.txt ]; then cp waiting_tips.txt HeroKill-release/; fi
           cp lib/win/* HeroKill-release
           cp fk_ver HeroKill-release
           cp "${QT_PREFIX}/bin"/li*.dll HeroKill-release
