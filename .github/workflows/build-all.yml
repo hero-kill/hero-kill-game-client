@@ -37,6 +37,12 @@ jobs:
         with:
           submodules: true
 
+      - name: Clone herokill-core
+        run: |
+          mkdir -p packages
+          cd packages
+          git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
+
       - name: Install build tools
         run: brew install swig
 
@@ -192,6 +198,13 @@ jobs:
         with:
           submodules: true
 
+      - name: Clone herokill-core
+        shell: bash
+        run: |
+          mkdir -p packages
+          cd packages
+          git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
+
       - name: Install swig
         run: choco install swig -y
 
@@ -283,14 +296,14 @@ jobs:
         run: |
           mkdir HeroKill-release
           cp build/HeroKill.exe HeroKill-release
-          cd HeroKill-release
-          windeployqt HeroKill.exe
-          cd ..
           cp -r audio fonts image packages client HeroKill-release/
           if [ -d lua ]; then cp -r lua HeroKill-release/; fi
           if [ -f waiting_tips.txt ]; then cp waiting_tips.txt HeroKill-release/; fi
           cp lib/win/* HeroKill-release
           cp fk_ver HeroKill-release
+          cd HeroKill-release
+          windeployqt --qmldir packages/herokill-core HeroKill.exe
+          cd ..
           cp "${QT_PREFIX}/bin"/li*.dll HeroKill-release
           cp "${QT_PREFIX}/../../Tools/OpenSSLv3/Win_x64/bin"/*.dll HeroKill-release
           7z a -t7z HeroKill-${{github.ref_name}}-Windows.7z HeroKill-release -r -mx=9 -m0=LZMA2 -ms=10m -mf=on -mhc=on -mmt=on
@@ -312,6 +325,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Clone herokill-core
+        run: |
+          mkdir -p packages
+          cd packages
+          git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
 
       - name: Cache Qt
         uses: actions/cache@v4
