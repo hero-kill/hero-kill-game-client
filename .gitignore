@@ -77,3 +77,4 @@ HeroKill-wrap.cxx
 ./packages/herokill-core/**
 /hero-kill-game-client.iml
 /keystore.jks
+/build-test

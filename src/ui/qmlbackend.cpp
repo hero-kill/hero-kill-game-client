@@ -29,6 +29,8 @@
 
 QmlBackend *Backend = nullptr;
 
+#include "core/path_resolver.h"
+
 QmlBackend::QmlBackend(QObject *parent) : QObject(parent) {
   Backend = this;
 #ifndef FK_SERVER_ONLY
@@ -49,7 +51,7 @@ QmlBackend::~QmlBackend() {
 void QmlBackend::cd(const QString &path) { QDir::setCurrent(path); }
 
 QStringList QmlBackend::ls(const QString &dir) {
-  QString d = dir;
+  QString d = resolvePackagePath(dir);
 #ifdef Q_OS_WIN
   if (d.startsWith("file:///"))
     d.replace(0, 8, "file://");
@@ -61,7 +63,7 @@ QStringList QmlBackend::ls(const QString &dir) {
 QString QmlBackend::pwd() { return QDir::currentPath(); }
 
 bool QmlBackend::exists(const QString &file) {
-  QString s = file;
+  QString s = resolvePackagePath(file);
 #ifdef Q_OS_WIN
   if (s.startsWith("file:///"))
     s.replace(0, 8, "file://");
@@ -70,7 +72,7 @@ bool QmlBackend::exists(const QString &file) {
 }
 
 bool QmlBackend::isDir(const QString &file) {
-  return QFileInfo(QUrl(file).path()).isDir();
+  return QFileInfo(QUrl(resolvePackagePath(file)).path()).isDir();
 }
 
 QJsonObject QmlBackend::readJsonObjectFromFile(const QString &file) {
@@ -280,26 +282,31 @@ void QmlBackend::saveConf(const QString &conf) {
 }
 
 void QmlBackend::playSound(const QString &name, int index) {
-  QString fname(name);
+  const QString resolvedName = resolvePackagePath(name);
+  QString fname;
 
-  // 查找可用的音频文件索引
   if (index == -1) {
-    int i = 1;
-    while (true) {
-      if (!QFile::exists(name + QString::number(i) + ".wav")) {
-        i--;
-        break;
-      }
-      i++;
+    // 收集全部候选: name.wav, name1.wav, name2.wav, ...
+    QStringList candidates;
+    if (QFile::exists(resolvedName + ".wav"))
+      candidates << resolvedName + ".wav";
+    for (int i = 1; ; ++i) {
+      const QString path = resolvedName + QString::number(i) + ".wav";
+      if (!QFile::exists(path)) break;
+      candidates << path;
     }
-    index = i == 0 ? 0 : (QRandomGenerator::global()->generate()) % i + 1;
+    if (candidates.isEmpty()) {
+      qWarning() << "Sound file not found:" << resolvedName;
+      return;
+    }
+    fname = candidates.at(QRandomGenerator::global()->bounded(candidates.size()));
+  } else {
+    // 构建文件名
+    if (index != 0)
+      fname = resolvedName + QString::number(index) + ".wav";
+    else
+      fname = resolvedName + ".wav";
   }
-
-  // 构建文件名
-  if (index != 0)
-    fname = fname + QString::number(index) + ".wav";
-  else
-    fname = fname + ".wav";
 
   // 检查文件是否存在
   QFileInfo fileInfo(fname);

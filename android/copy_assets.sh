@@ -20,8 +20,8 @@ cp -r ../lua assets/res
 cp -r /etc/ca-certificates/extracted/cadir assets/res/certs
 chmod 644 assets/res/certs/*
 mkdir assets/res/packages
-cp -r ../packages/standard1 assets/res/packages
-cp -r ../packages/standard_cards2 assets/res/packages
+cp -rL ../packages/herokill-core/standard assets/res/packages
+cp -rL ../packages/herokill-core/standard_cards assets/res/packages
 #cp -r ../packages/maneuvering assets/res/packages
 cp -r ../packages/test assets/res/packages
 rm assets/res/packages/test/test.lua

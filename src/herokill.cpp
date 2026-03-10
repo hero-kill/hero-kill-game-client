@@ -418,9 +418,9 @@ int herokill_main(int argc, char *argv[]) {
 
   Pacman = new PackMan;
 
-  // 创建符号链接，让 packages/standard 指向 packages/herokill-core/standard
-  QFile::link("herokill-core/standard", "packages/standard");
-  QFile::link("herokill-core/standard_cards", "packages/standard_cards");
+  // 不再创建符号链接：QmlBackend::resolvePackagePath() 会将
+  // packages/standard[_cards] 路径透明映射到 packages/herokill-core/standard[_cards]
+  // 这样在 Windows 上也能正常工作（QFile::link 在 Windows 只创建 .lnk 快捷方式）
 
 
   // 向 Qml 中先定义几个全局变量

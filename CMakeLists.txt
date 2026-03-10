@@ -9,6 +9,8 @@ cmake_minimum_required(VERSION 3.22)
 project(HeroKill VERSION 0.5.17)
 add_definitions(-DFK_VERSION=\"${CMAKE_PROJECT_VERSION}\")
 
+option(FK_TESTS "Enable tests" OFF)
+
 find_package(Qt6 REQUIRED COMPONENTS
   Network
 )
