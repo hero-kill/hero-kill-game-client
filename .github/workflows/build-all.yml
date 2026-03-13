@@ -43,6 +43,11 @@ jobs:
           cd packages
           git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
           rm -rf herokill-core/.git
+          # Strip large media assets (client downloads during pre-login update)
+          rm -rf herokill-core/standard/audio
+          rm -rf herokill-core/standard/image
+          rm -rf herokill-core/standard_cards/audio
+          rm -rf herokill-core/standard_cards/image
 
       - name: Install build tools
         run: brew install swig
@@ -205,6 +210,12 @@ jobs:
           mkdir -p packages
           cd packages
           git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
+          rm -rf herokill-core/.git
+          # Strip large media assets (client downloads during pre-login update)
+          rm -rf herokill-core/standard/audio
+          rm -rf herokill-core/standard/image
+          rm -rf herokill-core/standard_cards/audio
+          rm -rf herokill-core/standard_cards/image
 
       - name: Install swig
         run: choco install swig -y
@@ -333,6 +344,11 @@ jobs:
           cd packages
           git clone https://hero-kills:ef2iVXUMcaoZZC@gitee.com/hero-kill/herokill-core.git
           rm -rf herokill-core/.git
+          # Strip large media assets (client downloads during pre-login update)
+          rm -rf herokill-core/standard/audio
+          rm -rf herokill-core/standard/image
+          rm -rf herokill-core/standard_cards/audio
+          rm -rf herokill-core/standard_cards/image
 
       - name: Cache Qt
         uses: actions/cache@v4

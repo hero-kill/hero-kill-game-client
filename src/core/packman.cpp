@@ -147,6 +147,50 @@ void PackMan::loadSummary(const QString &jsonData, bool useThread) {
 #endif
 
       QString packPath = QString("packages/%1").arg(name);
+      // If directory exists but is not a valid git repo, move it aside
+      // and re-clone. On clone failure, restore the backup so the client
+      // can still start next time.
+      if (QDir(packPath).exists()) {
+        git_repository *testRepo = NULL;
+        int openErr = git_repository_open(&testRepo, packPath.toUtf8());
+        git_repository_free(testRepo);
+        if (openErr < 0) {
+          QString backupPath = packPath + ".bak";
+          QDir(backupPath).removeRecursively();
+          qInfo() << "Directory exists but is not a valid git repo, re-cloning:" << name;
+          if (!QDir().rename(packPath, backupPath)) {
+            qCritical() << "Failed to rename" << packPath << "to backup";
+            continue;
+          }
+          err = clone(url);
+          if (err != 0) {
+            // Clone failed — clean up partial clone, then restore backup
+            qCritical() << "Clone failed, restoring backup for:" << name;
+            QDir(packPath).removeRecursively();
+            if (!QDir().rename(backupPath, packPath)) {
+              qCritical() << "CRITICAL: Failed to restore backup for:" << name
+                          << "from" << backupPath;
+#ifndef FK_SERVER_ONLY
+              Backend->notifyUI("PackageDownloadError",
+                QString("Failed to restore backup for %1").arg(name));
+#endif
+            }
+#ifndef FK_SERVER_ONLY
+            QString msg;
+            if (err != 100) {
+              auto error = git_error_last();
+              msg = QString("Error: %1").arg(error ? error->message : "Unknown");
+            } else {
+              msg = "Workspace is dirty.";
+            }
+            Backend->notifyUI("PackageDownloadError", msg);
+#endif
+            continue;
+          }
+          // Clone succeeded — remove the backup
+          QDir(backupPath).removeRecursively();
+        }
+      }
       if (!QDir(packPath).exists()) {
         err = clone(url);
         if (err != 0) {
